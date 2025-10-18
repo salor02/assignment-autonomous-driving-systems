@@ -17,12 +17,13 @@
 #include <unordered_set>
 #include "../include/tree_utilities.hpp"
 #include <boost/filesystem.hpp>
-
 #include <unistd.h>
+
 namespace fs = boost::filesystem;
-#define USE_PCL_LIBRARY
+
 using namespace lidar_obstacle_detection;
 
+// #define USE_PCL_LIBRARY
 #define DATASET_PATH "../dataset_1"
 
 typedef std::unordered_set<int> my_visited_set_t;
@@ -102,11 +103,22 @@ std::vector<pcl::PointIndices> euclideanCluster(typename pcl::PointCloud<pcl::Po
     //  if the point has not been visited (use the function called "find")
     //    find clusters using the proximity function
     //
-    //    if we have more clusters than the minimum
+    //    if we have more points than the minimum
     //      Create the cluster and insert it in the vector of clusters. You can extract the indices from the cluster returned by the proximity funciton (use pcl::PointIndices)   
     //    end if
     //  end if
     //end for
+    for(int i = 0; i < cloud->size(); ++i){
+        if(visited.find(i) == visited.end()){
+            proximity(cloud, i, tree, distanceTol, visited, cluster, setMaxClusterSize);
+            if(cluster.size() >= setMinClusterSize){
+                pcl::PointIndices cluster_indices;
+                cluster_indices.indices = cluster;
+                clusters.push_back(cluster_indices);
+            }
+            cluster.clear();
+        }
+    }
 	return clusters;	
 }
 
@@ -195,15 +207,16 @@ void cluster_extraction(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, std::vector<
         euclidean_cluster.setInputCloud(cloud);
         euclidean_cluster.extract(cluster_indices);
 
-        std::cerr << "Clusters correctly extraxted: " << cluster_indices.size() << std::endl;
-
     #else
         // Optional assignment
         my_pcl::KdTree treeM;
         treeM.set_dimension(3);
-        setupKdtree(cloud_filtered, &treeM, 3);
-        cluster_indices = euclideanCluster(cloud_filtered, &treeM, clusterTolerance, setMinClusterSize, setMaxClusterSize);
+        setupKdtree(cloud, &treeM, 3);
+        cluster_indices = euclideanCluster(cloud, &treeM, 0.2, 100, 25000);
     #endif
+
+    std::cerr << "Clusters correctly extraxted: " << cluster_indices.size() << std::endl;
+
 }
 
 // renders clusters and boxes around them
