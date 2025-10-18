@@ -117,8 +117,6 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
     downsampler.setInputCloud(cloud);
     downsampler.setLeafSize(0.1f, 0.1f, 0.1f); //this value defines how much the PC is filtered
     downsampler.filter(*cloud_filtered);
-    
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_plane (new pcl::PointCloud<pcl::PointXYZ> ());
 
     // 2) here we crop the points that are far away from us, in which we are not interested
     pcl::CropBox<pcl::PointXYZ> cb(true);
@@ -128,10 +126,38 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
     cb.filter(*cloud_filtered); 
 
     // TODO: 3) Segmentation and apply RANSAC
+    // Create the segmentation object
+    pcl::SACSegmentation<pcl::PointXYZ> seg;
+    // Optional
+    seg.setOptimizeCoefficients(true);
+    // Mandatory
+    seg.setModelType(pcl::SACMODEL_PLANE);
+    seg.setMethodType(pcl::SAC_RANSAC);
+    seg.setDistanceThreshold(0.01);
 
+    // TODO: 4) iterate over the filtered cloud, segment and remove the planar inliers
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_plane (new pcl::PointCloud<pcl::PointXYZ> ());
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_aux (new pcl::PointCloud<pcl::PointXYZ>); //aux point cloud
+    pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients);
+    pcl::PointIndices::Ptr inliers (new pcl::PointIndices);
 
-    // TODO: 4) iterate over the filtered cloud, segment and remove the planar inliers 
+    seg.setInputCloud(cloud);
+    seg.segment(*inliers, *coefficients);
 
+    // Create the filtering object
+    pcl::ExtractIndices<pcl::PointXYZ> extract;
+
+    // Extract the inliers (here we extract the points of the plane moving the indices representing the plane to cloud_segmented)
+    extract.setInputCloud(cloud_filtered); 
+    
+    //PCL defines a way to define a region of interest / list of point indices that the algorithm should operate on, rather than the entire cloud, via setIndices.
+    extract.setIndices(inliers);
+    extract.setNegative(false); // Retrieve indices to all points in cloud_filtered but only those referenced by inliers:
+    extract.filter(*cloud_plane);   // We effectively retrieve JUST the plane
+    
+    std::cerr << "PointCloud representing the planar component: " << cloud_plane->width * cloud_plane->height << " data points." << std::endl;
+    
+    cloud_filtered.swap(cloud_plane); // Here we swap the cloud (the removed plane one) with the original
 
     // TODO: 5) Create the KDTree and the vector of PointIndices
 
