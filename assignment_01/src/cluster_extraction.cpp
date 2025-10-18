@@ -110,65 +110,78 @@ std::vector<pcl::PointIndices> euclideanCluster(typename pcl::PointCloud<pcl::Po
 	return clusters;	
 }
 
-void 
-ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud)
-{
-    std::vector<Color> colors = {Color(1,0,0), Color(1,1,0), Color(0,0,1), Color(1,0,1), Color(0,1,1)};
-
-    // TODO: 1) Downsample the dataset 
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>);
+// executes voxel filtering on the original cloud and builds the filtered cloud
+void downsample(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_downsampled){
     pcl::VoxelGrid<pcl::PointXYZ> downsampler;
     downsampler.setInputCloud(cloud);
-    downsampler.setLeafSize(0.1f, 0.1f, 0.1f); //this value defines how much the PC is filtered
-    downsampler.filter(*cloud_filtered);
+    downsampler.setLeafSize(0.1f, 0.1f, 0.1f);
+    downsampler.filter(*cloud_downsampled);
+}
 
-    // 2) here we crop the points that are far away from us, in which we are not interested
+// crops the points that are far away from ego vehicle
+void crop(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_cropped){
     pcl::CropBox<pcl::PointXYZ> cb(true);
-    cb.setInputCloud(cloud_filtered);
+    cb.setInputCloud(cloud_cropped);
     cb.setMin(Eigen::Vector4f (-20, -6, -2, 1));
     cb.setMax(Eigen::Vector4f ( 30, 7, 5, 1));
-    cb.filter(*cloud_filtered); 
-    
-    // TODO: 3) Segmentation and apply RANSAC
+    cb.filter(*cloud_cropped); 
+}
+
+// segments and filters the cloud to separate the plane (road) from the rest of the cloud
+void RANSAC_segmentation(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_plane){
     // Create the segmentation object
     pcl::SACSegmentation<pcl::PointXYZ> seg;
-    // Optional
     seg.setOptimizeCoefficients(true);
-    // Mandatory
     seg.setModelType(pcl::SACMODEL_PLANE);
     seg.setMethodType(pcl::SAC_RANSAC);
     seg.setDistanceThreshold(0.1);
 
-    // TODO: 4) iterate over the filtered cloud, segment and remove the planar inliers
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_plane (new pcl::PointCloud<pcl::PointXYZ> ());
-    pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients);
-    pcl::PointIndices::Ptr inliers (new pcl::PointIndices);
-
-    seg.setInputCloud(cloud_filtered);
-    seg.segment(*inliers, *coefficients);
-
     // Create the filtering object
     pcl::ExtractIndices<pcl::PointXYZ> extract;
-
-    // Extract the inliers (here we extract the points of the plane moving the indices representing the plane to cloud_segmented)
-    extract.setInputCloud(cloud_filtered); 
     
-    //PCL defines a way to define a region of interest / list of point indices that the algorithm should operate on, rather than the entire cloud, via setIndices.
-    extract.setIndices(inliers);
-    extract.setNegative(false); // Retrieve indices to all points in cloud_filtered but only those referenced by inliers:
-    extract.filter(*cloud_plane);   // We effectively retrieve JUST the plane
-    std::cerr << "PointCloud representing the planar component: " << cloud_plane->width * cloud_plane->height << " data points." << std::endl;
+    // Create and get coefficients and inliers of the plane model
+    pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients);
+    pcl::PointIndices::Ptr inliers (new pcl::PointIndices);
     
-    extract.setNegative(true);
-    extract.filter(*cloud_filtered); 
+    int num_original_cloud_points = (int) cloud->size();
+    int num_iterations = 0;
 
+    /*
+        The following loop execute the segmentation algorithm until the cloud size reachs a defined treshold.
+        This approach would be useful in case more than one plane was present in the scene. Since in both dataset 1 and 2
+        the only present plane is the road this cycle shall execute always just once. 
+    */
+    while (cloud->size () > 0.6 * num_original_cloud_points){
+        seg.setInputCloud(cloud);
+        seg.segment(*inliers, *coefficients);
 
-    // TODO: 5) Create the KDTree and the vector of PointIndices
+        /*
+            The following lines do:
+                1. setting the starting cloud from which to extract the segmented points
+                2. setting the indices of the points to extract
+                3. setting the behaviour of the filter 
+                    - false -> retrieve a cloud composed of just inliers points
+                    - true -> retrieve a cloud composed of the original cloud - inliers points
+        */
+        extract.setInputCloud(cloud); 
+        extract.setIndices(inliers);
+        extract.setNegative(false);
+        extract.filter(*cloud_plane);
+        std::cerr << "PointCloud representing the planar component: " << cloud_plane->width * cloud_plane->height << " data points." << std::endl;
+        extract.setNegative(true);
+        extract.filter(*cloud);
+        std::cerr << "PointCloud representing the non-planar component: " << cloud->width * cloud->height << " data points." << std::endl;
+
+        num_iterations++;
+    }
+    std::cerr << "Segmentation completed after " << num_iterations << " iterations." <<std::endl;
+}
+
+// retrieves cluster from a cloud
+void cluster_extraction(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, std::vector<pcl::PointIndices>& cluster_indices){
     pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
-    tree->setInputCloud(cloud_filtered); 
-    std::vector<pcl::PointIndices> cluster_indices;
+    tree->setInputCloud(cloud);
 
-    // TODO: 6) Set the spatial tolerance for new cluster candidates (pay attention to the tolerance!!!)
     #ifdef USE_PCL_LIBRARY
         pcl::EuclideanClusterExtraction<pcl::PointXYZ> euclidean_cluster;
 
@@ -179,7 +192,7 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
         euclidean_cluster.setMinClusterSize(100);
         euclidean_cluster.setMaxClusterSize(25000);
         euclidean_cluster.setSearchMethod(tree);
-        euclidean_cluster.setInputCloud(cloud_filtered);
+        euclidean_cluster.setInputCloud(cloud);
         euclidean_cluster.extract(cluster_indices);
 
         std::cerr << "Clusters correctly extraxted: " << cluster_indices.size() << std::endl;
@@ -191,41 +204,66 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
         setupKdtree(cloud_filtered, &treeM, 3);
         cluster_indices = euclideanCluster(cloud_filtered, &treeM, clusterTolerance, setMinClusterSize, setMaxClusterSize);
     #endif
+}
 
-    /**Now we extracted the clusters out of our point cloud and saved the indices in cluster_indices. 
-
-    To separate each cluster out of the vector<PointIndices> we have to iterate through cluster_indices, create a new PointCloud for each entry and write all points of the current cluster in the PointCloud.
-    Compute euclidean distance
-    **/
+// renders clusters and boxes around them
+void render_clusters(Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, const std::vector<pcl::PointIndices>& cluster_indices){
     int j = 0;
     int clusterId = 0;
+
+    /*
+        The following lines do:
+            1. iteration over cluster indices. Each one represents a single cluster
+            2. iterarion over the points belonging to one same cluster
+            3. each of these point is pushed in a new cloud, representing the current cluster
+            4. rendering of the cluster and a box around it
+    */
     for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
     {
         pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_cluster (new pcl::PointCloud<pcl::PointXYZ>);
         for (std::vector<int>::const_iterator pit = it->indices.begin (); pit != it->indices.end (); ++pit)
-            cloud_cluster->push_back ((*cloud_filtered)[*pit]); 
+            cloud_cluster->push_back((*cloud)[*pit]); 
         cloud_cluster->width = cloud_cluster->size ();
         cloud_cluster->height = 1;
         cloud_cluster->is_dense = true;
-
-        // TODO: 7) render the cluster and plane without rendering the original cloud 
+        
+        // rendering of the cloud representing the cluster
         renderer.RenderPointCloud(cloud_cluster,"cluster_"+std::to_string(clusterId),Color(0,0,1));
 
-        //Here we create the bounding box on the detected clusters
+        // rendering of the box around the cluster
         pcl::PointXYZ minPt, maxPt;
         pcl::getMinMax3D(*cloud_cluster, minPt, maxPt);
-
-        //TODO: 8) Here you can plot the distance of each cluster w.r.t ego vehicle
         Box box{minPt.x, minPt.y, minPt.z,
         maxPt.x, maxPt.y, maxPt.z};
-        //TODO: 9) Here you can color the vehicles that are both in front and 5 meters away from the ego vehicle
-        //please take a look at the function RenderBox to see how to color the box
         renderer.RenderBox(box, j);
 
+        //TODO: 8) Here you can plot the distance of each cluster w.r.t ego vehicle
+        
+        //TODO: 9) Here you can color the vehicles that are both in front and 5 meters away from the ego vehicle
+        //please take a look at the function RenderBox to see how to color the box
+        
         ++clusterId;
         j++;
     }
+}
 
+void ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud)
+{
+    std::vector<Color> colors = {Color(1,0,0), Color(1,1,0), Color(0,0,1), Color(1,0,1), Color(0,1,1)};
+
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>);
+    downsample(cloud, cloud_filtered);
+
+    crop(cloud_filtered);
+    
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_plane (new pcl::PointCloud<pcl::PointXYZ> ());
+    RANSAC_segmentation(cloud_filtered, cloud_plane);
+
+    std::vector<pcl::PointIndices> cluster_indices;
+    cluster_extraction(cloud_filtered, cluster_indices);
+
+    render_clusters(renderer, cloud_filtered, cluster_indices);
+    
     renderer.RenderPointCloud(cloud_plane,"cloud_plane", Color(0,1,0));
     // renderer.RenderPointCloud(cloud_filtered,"cloud_filtered", Color(0,0,1));
     // renderer.RenderPointCloud(cloud,"cloud", Color(0,0,1));
