@@ -17,6 +17,8 @@
 #include <unordered_set>
 #include "../include/tree_utilities.hpp"
 #include <boost/filesystem.hpp>
+
+#include <unistd.h>
 namespace fs = boost::filesystem;
 #define USE_PCL_LIBRARY
 using namespace lidar_obstacle_detection;
@@ -111,6 +113,8 @@ std::vector<pcl::PointIndices> euclideanCluster(typename pcl::PointCloud<pcl::Po
 void 
 ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud)
 {
+    std::vector<Color> colors = {Color(1,0,0), Color(1,1,0), Color(0,0,1), Color(1,0,1), Color(0,1,1)};
+
     // TODO: 1) Downsample the dataset 
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>);
     pcl::VoxelGrid<pcl::PointXYZ> downsampler;
@@ -124,7 +128,7 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
     cb.setMin(Eigen::Vector4f (-20, -6, -2, 1));
     cb.setMax(Eigen::Vector4f ( 30, 7, 5, 1));
     cb.filter(*cloud_filtered); 
-
+    
     // TODO: 3) Segmentation and apply RANSAC
     // Create the segmentation object
     pcl::SACSegmentation<pcl::PointXYZ> seg;
@@ -133,15 +137,14 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
     // Mandatory
     seg.setModelType(pcl::SACMODEL_PLANE);
     seg.setMethodType(pcl::SAC_RANSAC);
-    seg.setDistanceThreshold(0.01);
+    seg.setDistanceThreshold(0.1);
 
     // TODO: 4) iterate over the filtered cloud, segment and remove the planar inliers
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_plane (new pcl::PointCloud<pcl::PointXYZ> ());
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_aux (new pcl::PointCloud<pcl::PointXYZ>); //aux point cloud
     pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients);
     pcl::PointIndices::Ptr inliers (new pcl::PointIndices);
 
-    seg.setInputCloud(cloud);
+    seg.setInputCloud(cloud_filtered);
     seg.segment(*inliers, *coefficients);
 
     // Create the filtering object
@@ -154,10 +157,11 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
     extract.setIndices(inliers);
     extract.setNegative(false); // Retrieve indices to all points in cloud_filtered but only those referenced by inliers:
     extract.filter(*cloud_plane);   // We effectively retrieve JUST the plane
-    
     std::cerr << "PointCloud representing the planar component: " << cloud_plane->width * cloud_plane->height << " data points." << std::endl;
     
-    cloud_filtered.swap(cloud_plane); // Here we swap the cloud (the removed plane one) with the original
+    extract.setNegative(true);
+    extract.filter(*cloud_filtered); 
+
 
     // TODO: 5) Create the KDTree and the vector of PointIndices
 
@@ -176,9 +180,6 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
         setupKdtree(cloud_filtered, &treeM, 3);
         cluster_indices = euclideanCluster(cloud_filtered, &treeM, clusterTolerance, setMinClusterSize, setMaxClusterSize);
     #endif
-
-    std::vector<Color> colors = {Color(1,0,0), Color(1,1,0), Color(0,0,1), Color(1,0,1), Color(0,1,1)};
-
 
     /**Now we extracted the clusters out of our point cloud and saved the indices in cluster_indices. 
 
@@ -214,8 +215,10 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
 
         ++clusterId;
         j++;
-    }  
+    }
 
+    renderer.RenderPointCloud(cloud_plane,"cloud_plane", Color(0,1,0));
+    renderer.RenderPointCloud(cloud_filtered,"cloud_filtered", Color(0,0,1));
 }
 
 
@@ -255,5 +258,7 @@ int main(int argc, char* argv[])
             streamIterator = stream.begin();
 
         renderer.SpinViewerOnce();
+        
+        usleep(1000 * 50); //debug
     }
 }
