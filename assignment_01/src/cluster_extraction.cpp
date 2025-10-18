@@ -164,15 +164,26 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
 
 
     // TODO: 5) Create the KDTree and the vector of PointIndices
-
-
-    // TODO: 6) Set the spatial tolerance for new cluster candidates (pay attention to the tolerance!!!)
+    pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
+    tree->setInputCloud(cloud_filtered); 
     std::vector<pcl::PointIndices> cluster_indices;
 
+    // TODO: 6) Set the spatial tolerance for new cluster candidates (pay attention to the tolerance!!!)
     #ifdef USE_PCL_LIBRARY
+        pcl::EuclideanClusterExtraction<pcl::PointXYZ> euclidean_cluster;
 
-        //PCL functions
-        //HERE 6)
+        //If you take a very small value, it can happen that an actual object can be seen as multiple clusters. On the other hand, if you set the value too high, it could happen, that multiple objects are seen as one cluster
+        euclidean_cluster.setClusterTolerance(0.2);
+
+        //We impose that the clusters found must have at least setMinClusterSize() points and maximum setMaxClusterSize() points
+        euclidean_cluster.setMinClusterSize(100);
+        euclidean_cluster.setMaxClusterSize(25000);
+        euclidean_cluster.setSearchMethod(tree);
+        euclidean_cluster.setInputCloud(cloud_filtered);
+        euclidean_cluster.extract(cluster_indices);
+
+        std::cerr << "Clusters correctly extraxted: " << cluster_indices.size() << std::endl;
+
     #else
         // Optional assignment
         my_pcl::KdTree treeM;
@@ -192,15 +203,13 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
     {
         pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_cluster (new pcl::PointCloud<pcl::PointXYZ>);
         for (std::vector<int>::const_iterator pit = it->indices.begin (); pit != it->indices.end (); ++pit)
-        cloud_cluster->push_back ((*cloud_filtered)[*pit]); 
+            cloud_cluster->push_back ((*cloud_filtered)[*pit]); 
         cloud_cluster->width = cloud_cluster->size ();
         cloud_cluster->height = 1;
         cloud_cluster->is_dense = true;
 
-        renderer.RenderPointCloud(cloud,"originalCloud"+std::to_string(clusterId),colors[2]);
         // TODO: 7) render the cluster and plane without rendering the original cloud 
-        //<-- here
-        //----------
+        renderer.RenderPointCloud(cloud_cluster,"cluster_"+std::to_string(clusterId),Color(0,0,1));
 
         //Here we create the bounding box on the detected clusters
         pcl::PointXYZ minPt, maxPt;
@@ -218,7 +227,8 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
     }
 
     renderer.RenderPointCloud(cloud_plane,"cloud_plane", Color(0,1,0));
-    renderer.RenderPointCloud(cloud_filtered,"cloud_filtered", Color(0,0,1));
+    // renderer.RenderPointCloud(cloud_filtered,"cloud_filtered", Color(0,0,1));
+    // renderer.RenderPointCloud(cloud,"cloud", Color(0,0,1));
 }
 
 
@@ -258,7 +268,7 @@ int main(int argc, char* argv[])
             streamIterator = stream.begin();
 
         renderer.SpinViewerOnce();
-        
+
         usleep(1000 * 50); //debug
     }
 }
