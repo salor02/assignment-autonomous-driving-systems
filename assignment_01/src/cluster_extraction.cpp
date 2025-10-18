@@ -21,6 +21,8 @@ namespace fs = boost::filesystem;
 #define USE_PCL_LIBRARY
 using namespace lidar_obstacle_detection;
 
+#define DATASET_PATH "../dataset_1"
+
 typedef std::unordered_set<int> my_visited_set_t;
 
 //This function sets up the custom kdtree using the point cloud
@@ -111,6 +113,11 @@ ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::
 {
     // TODO: 1) Downsample the dataset 
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::VoxelGrid<pcl::PointXYZ> downsampler;
+    downsampler.setInputCloud(cloud);
+    downsampler.setLeafSize(0.1f, 0.1f, 0.1f); //this value defines how much the PC is filtered
+    downsampler.filter(*cloud_filtered);
+    
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_plane (new pcl::PointCloud<pcl::PointXYZ> ());
 
     // 2) here we crop the points that are far away from us, in which we are not interested
@@ -195,7 +202,7 @@ int main(int argc, char* argv[])
 
     pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud (new pcl::PointCloud<pcl::PointXYZ>);
 
-    std::vector<boost::filesystem::path> stream(boost::filesystem::directory_iterator{"/home/thrun/Desktop/1_lidar/dataset_1"},
+    std::vector<boost::filesystem::path> stream(boost::filesystem::directory_iterator{DATASET_PATH},
                                                 boost::filesystem::directory_iterator{});
 
     // sort files in ascending (chronological) order
