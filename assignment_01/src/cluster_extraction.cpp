@@ -10,53 +10,65 @@
 #include <pcl/segmentation/sac_segmentation.h>
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl/filters/crop_box.h>
-#include "../include/Renderer.hpp"
 #include <pcl/point_types.h>
 #include <pcl/common/common.h>
 #include <chrono>
 #include <unordered_set>
-#include "../include/tree_utilities.hpp"
 #include <boost/filesystem.hpp>
 #include <unistd.h>
+#include "../include/Renderer.hpp"
+#include "../include/tree_utilities.hpp"
 
 namespace fs = boost::filesystem;
 
 using namespace lidar_obstacle_detection;
 
-// #define USE_PCL_LIBRARY
-#define DATASET_PATH "../dataset_1"
+#define USE_PCL_LIBRARY
 
 typedef std::unordered_set<int> my_visited_set_t;
 
-//This function sets up the custom kdtree using the point cloud
-void setupKdtree(typename pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, my_pcl::KdTree* tree, int dimension)
-{
-    //insert point cloud points into tree
-    for (int i = 0; i < cloud->size(); ++i)
-    {
+// downsapling parameters
+const static float LEAF_X = 0.1;
+const static float LEAF_Y = 0.1;
+const static float LEAF_Z = 0.1;
+
+// RANSAC segmentation parameters
+const static double PLANE_DIST_TRESHOLD = 0.1;
+const static double SEGMENTATION_TRESHOLD = 0.6;
+
+// clustering parameters
+const static double CLUSTER_TOLERANCE = 0.2;
+const static int MIN_CLUSTER_SIZE = 100;
+const static int MAX_CLUSTER_SIZE = 25000;
+
+
+// sets up the custom kdtree using the point cloud
+void setupKdtree(typename pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, my_pcl::KdTree* tree, int dimension){
+    // insert point cloud points into tree
+    for (int i = 0; i < cloud->size(); ++i){
         tree->insert({cloud->at(i).x, cloud->at(i).y, cloud->at(i).z}, i);
     }
 }
 
 /*
-OPTIONAL
-This function computes the nearest neighbors and builds the clusters
-    - Input:
-        + cloud: Point cloud to be explored
-        + target_ndx: i-th point to visit
-        + tree: kd tree for searching neighbors
-        + distanceTol: Distance tolerance to build the clusters 
-        + visited: Visited points --> typedef std::unordered_set<int> my_visited_set_t;
-        + cluster: Here we add points that will represent the cluster
-        + max: Max cluster size
-    - Output:
-        + visited: already visited points
-        + cluster: at the end of this function we will have one cluster
+    This function computes the nearest neighbors and builds the clusters.
+    This is a recursive function that keeps adding points to the cluster searching them in the previously built
+    KD-tree in a range equal to distanceTol distance. This function's stopping condition is represented by the impossibility to add
+    a new point in the cluster, either because the max cluster size has been reached or because no further neighbors has been found.
+        - Input:
+            + cloud: Point cloud to be explored
+            + target_ndx: i-th point to visit
+            + tree: kd tree for searching neighbors
+            + distanceTol: Distance tolerance to build the clusters 
+            + visited: Visited points --> typedef std::unordered_set<int> my_visited_set_t;
+            + cluster: Here we add points that will represent the cluster
+            + max: Max cluster size
+        - Output:
+            + visited: already visited points
+            + cluster: at the end of this function we will have one cluster
 */
-void proximity(typename pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int target_ndx, my_pcl::KdTree* tree, float distanceTol, my_visited_set_t& visited, std::vector<int>& cluster, int max)
-{
-	if (cluster.size() < max)
-    {
+void proximity(typename pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int target_ndx, my_pcl::KdTree* tree, float distanceTol, my_visited_set_t& visited, std::vector<int>& cluster, int max){
+	if (cluster.size() < max){
         cluster.push_back(target_ndx);
         visited.insert(target_ndx);
 
@@ -65,16 +77,13 @@ void proximity(typename pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int target_nd
         // get all neighboring indices of point
         std::vector<int> neighborNdxs = tree->search(point, distanceTol);
 
-        for (int neighborNdx : neighborNdxs)
-        {
+        for (int neighborNdx : neighborNdxs){
             // if point was not visited
-            if (visited.find(neighborNdx) == visited.end())
-            {
+            if (visited.find(neighborNdx) == visited.end()){
                 proximity(cloud, neighborNdx, tree, distanceTol, visited, cluster, max);
             }
 
-            if (cluster.size() >= max)
-            {
+            if (cluster.size() >= max){
                 return;
             }
         }
@@ -82,36 +91,38 @@ void proximity(typename pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, int target_nd
 }
 
 /*
-OPTIONAL
-This function builds the clusters following a euclidean clustering approach
-    - Input:
-        + cloud: Point cloud to be explored
-        + tree: kd tree for searching neighbors
-        + distanceTol: Distance tolerance to build the clusters 
-        + setMinClusterSize: Minimum cluster size
-        + setMaxClusterSize: Max cluster size
-    - Output:
-        + cluster: at the end of this function we will have a set of clusters
-TODO: Complete the function
+    This function builds the clusters following a euclidean clustering approach
+        - Input:
+            + cloud: Point cloud to be explored
+            + tree: kd tree for searching neighbors
+            + distanceTol: Distance tolerance to build the clusters 
+            + setMinClusterSize: Minimum cluster size
+            + setMaxClusterSize: Max cluster size
+        - Output:
+            + cluster: at the end of this function we will have a set of clusters
 */
-std::vector<pcl::PointIndices> euclideanCluster(typename pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, my_pcl::KdTree* tree, float distanceTol, int setMinClusterSize, int setMaxClusterSize)
+std::vector<pcl::PointIndices> euclideanCluster(typename pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, my_pcl::KdTree* tree, float distanceTol, int MinClusterSize, int MaxClusterSize)
 {
-	my_visited_set_t visited{};                                                          //already visited points
-	std::vector<pcl::PointIndices> clusters;                                             //vector of PointIndices that will contain all the clusters
-    std::vector<int> cluster;                                                            //vector of int that is used to store the points that the function proximity will give me back
-	//for every point of the cloud
-    //  if the point has not been visited (use the function called "find")
-    //    find clusters using the proximity function
-    //
-    //    if we have more points than the minimum
-    //      Create the cluster and insert it in the vector of clusters. You can extract the indices from the cluster returned by the proximity funciton (use pcl::PointIndices)   
-    //    end if
-    //  end if
-    //end for
+    // already visited points
+	my_visited_set_t visited{};   
+    
+    // vector of PointIndices that will contain all the clusters, each PointIndices object is essentially a vector of int values
+	std::vector<pcl::PointIndices> clusters; 
+    
+    // vector of int values representing the indices of points included in the cluster by the proximity function
+    std::vector<int> cluster; 
+    
+    /*
+        The following lines do:
+            1. iterates over every point of the cloud
+            2. if the point has not been visited yet it means that it's possibile to build a new cluster starting from that point,
+               then the proximity function is launched.
+            3. if the computed cluster is large enough then it is included in the cluster list
+    */
     for(int i = 0; i < cloud->size(); ++i){
         if(visited.find(i) == visited.end()){
-            proximity(cloud, i, tree, distanceTol, visited, cluster, setMaxClusterSize);
-            if(cluster.size() >= setMinClusterSize){
+            proximity(cloud, i, tree, distanceTol, visited, cluster, MaxClusterSize);
+            if(cluster.size() >= MinClusterSize){
                 pcl::PointIndices cluster_indices;
                 cluster_indices.indices = cluster;
                 clusters.push_back(cluster_indices);
@@ -126,7 +137,7 @@ std::vector<pcl::PointIndices> euclideanCluster(typename pcl::PointCloud<pcl::Po
 void downsample(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_downsampled){
     pcl::VoxelGrid<pcl::PointXYZ> downsampler;
     downsampler.setInputCloud(cloud);
-    downsampler.setLeafSize(0.1f, 0.1f, 0.1f);
+    downsampler.setLeafSize(LEAF_X, LEAF_Y, LEAF_Z);
     downsampler.filter(*cloud_downsampled);
 }
 
@@ -146,7 +157,7 @@ void RANSAC_segmentation(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, pcl::PointC
     seg.setOptimizeCoefficients(true);
     seg.setModelType(pcl::SACMODEL_PLANE);
     seg.setMethodType(pcl::SAC_RANSAC);
-    seg.setDistanceThreshold(0.1);
+    seg.setDistanceThreshold(PLANE_DIST_TRESHOLD);
 
     // Create the filtering object
     pcl::ExtractIndices<pcl::PointXYZ> extract;
@@ -163,7 +174,7 @@ void RANSAC_segmentation(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, pcl::PointC
         This approach would be useful in case more than one plane was present in the scene. Since in both dataset 1 and 2
         the only present plane is the road this cycle shall execute always just once. 
     */
-    while (cloud->size () > 0.6 * num_original_cloud_points){
+    while (cloud->size () > SEGMENTATION_TRESHOLD * num_original_cloud_points){
         seg.setInputCloud(cloud);
         seg.segment(*inliers, *coefficients);
 
@@ -197,22 +208,21 @@ void cluster_extraction(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, std::vector<
     #ifdef USE_PCL_LIBRARY
         pcl::EuclideanClusterExtraction<pcl::PointXYZ> euclidean_cluster;
 
-        //If you take a very small value, it can happen that an actual object can be seen as multiple clusters. On the other hand, if you set the value too high, it could happen, that multiple objects are seen as one cluster
-        euclidean_cluster.setClusterTolerance(0.2);
+        // if you take a very small value, it can happen that an actual object can be seen as multiple clusters. On the other hand, if you set the value too high, it could happen, that multiple objects are seen as one cluster
+        euclidean_cluster.setClusterTolerance(CLUSTER_TOLERANCE);
 
-        //We impose that the clusters found must have at least setMinClusterSize() points and maximum setMaxClusterSize() points
-        euclidean_cluster.setMinClusterSize(100);
-        euclidean_cluster.setMaxClusterSize(25000);
+        // we impose that the clusters found must have at least setMinClusterSize() points and maximum setMaxClusterSize() points
+        euclidean_cluster.setMinClusterSize(MIN_CLUSTER_SIZE);
+        euclidean_cluster.setMaxClusterSize(MAX_CLUSTER_SIZE);
         euclidean_cluster.setSearchMethod(tree);
         euclidean_cluster.setInputCloud(cloud);
         euclidean_cluster.extract(cluster_indices);
 
     #else
-        // Optional assignment
         my_pcl::KdTree treeM;
         treeM.set_dimension(3);
         setupKdtree(cloud, &treeM, 3);
-        cluster_indices = euclideanCluster(cloud, &treeM, 0.2, 100, 25000);
+        cluster_indices = euclideanCluster(cloud, &treeM, CLUSTER_TOLERANCE, MIN_CLUSTER_SIZE, MAX_CLUSTER_SIZE);
     #endif
 
     std::cerr << "Clusters correctly extraxted: " << cluster_indices.size() << std::endl;
@@ -282,9 +292,13 @@ void ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointX
     // renderer.RenderPointCloud(cloud,"cloud", Color(0,0,1));
 }
 
-
 int main(int argc, char* argv[])
 {
+    if(argc < 2){
+        std::cerr << "No arguments provided. Exiting." << std::endl;
+        return 1;
+    }
+
     Renderer renderer;
     renderer.InitCamera(CameraAngle::XY);
     // Clear viewer
@@ -292,7 +306,7 @@ int main(int argc, char* argv[])
 
     pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud (new pcl::PointCloud<pcl::PointXYZ>);
 
-    std::vector<boost::filesystem::path> stream(boost::filesystem::directory_iterator{DATASET_PATH},
+    std::vector<boost::filesystem::path> stream(boost::filesystem::directory_iterator{argv[1]},
                                                 boost::filesystem::directory_iterator{});
 
     // sort files in ascending (chronological) order
