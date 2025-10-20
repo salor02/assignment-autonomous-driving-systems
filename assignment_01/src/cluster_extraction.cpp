@@ -170,7 +170,7 @@ void RANSAC_segmentation(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, pcl::PointC
     int num_iterations = 0;
 
     /*
-        The following loop execute the segmentation algorithm until the cloud size reachs a defined treshold.
+        The following loop executes the segmentation algorithm until the cloud size reachs a defined treshold.
         This approach would be useful in case more than one plane was present in the scene. Since in both dataset 1 and 2
         the only present plane is the road this cycle shall execute always just once. 
     */
@@ -180,9 +180,9 @@ void RANSAC_segmentation(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, pcl::PointC
 
         /*
             The following lines do:
-                1. setting the starting cloud from which to extract the segmented points
-                2. setting the indices of the points to extract
-                3. setting the behaviour of the filter 
+                1. set the starting cloud from which to extract the segmented points
+                2. set the indices of the points to extract
+                3. set the behaviour of the filter 
                     - false -> retrieve a cloud composed of just inliers points
                     - true -> retrieve a cloud composed of the original cloud - inliers points
         */
@@ -229,6 +229,16 @@ void cluster_extraction(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, std::vector<
 
 }
 
+float distance_from_ego(const Box &box){
+    float x = std::min(abs(box.x_min), abs(box.x_max));
+    float y = std::min(abs(box.y_min), abs(box.y_max));
+    float z = std::min(abs(box.z_min), abs(box.z_max));
+
+    float distance = sqrt(pow(x, 2) + pow(y, 2) + pow(z,2));
+
+    return distance;
+}
+
 // renders clusters and boxes around them
 void render_clusters(Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, const std::vector<pcl::PointIndices>& cluster_indices){
     int j = 0;
@@ -256,11 +266,16 @@ void render_clusters(Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::Ptr& cl
         // rendering of the box around the cluster
         pcl::PointXYZ minPt, maxPt;
         pcl::getMinMax3D(*cloud_cluster, minPt, maxPt);
-        Box box{minPt.x, minPt.y, minPt.z,
-        maxPt.x, maxPt.y, maxPt.z};
+        Box box{
+            minPt.x, minPt.y, minPt.z,
+            maxPt.x, maxPt.y, maxPt.z
+        };
         renderer.RenderBox(box, j);
 
         //TODO: 8) Here you can plot the distance of each cluster w.r.t ego vehicle
+        
+        renderer.addText(minPt.x, minPt.y, minPt.z,std::to_string(distance_from_ego(box)));
+
         
         //TODO: 9) Here you can color the vehicles that are both in front and 5 meters away from the ego vehicle
         //please take a look at the function RenderBox to see how to color the box
