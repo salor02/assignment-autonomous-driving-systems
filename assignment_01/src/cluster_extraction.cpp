@@ -286,22 +286,28 @@ void render_clusters(Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::Ptr& cl
         // rendering of the cloud representing the cluster
         renderer.RenderPointCloud(cloud_cluster,"cluster_"+std::to_string(clusterId),Color(0,0,1));
 
-        // rendering of the box around the cluster
         pcl::PointXYZ minPt, maxPt;
         pcl::getMinMax3D(*cloud_cluster, minPt, maxPt);
         Box box{
             minPt.x, minPt.y, minPt.z,
             maxPt.x, maxPt.y, maxPt.z
         };
-        renderer.RenderBox(box, j);
 
+        // rendering of the cluster distance from ego vehicle
         pcl::PointXYZ nearest = get_nearest_point(box);
-        renderer.addText(minPt.x, minPt.y, minPt.z,std::to_string(distance_from_ego(nearest)));
+        float distance = distance_from_ego(nearest);
+        renderer.addText(minPt.x, minPt.y, minPt.z,std::to_string(distance));
         renderer.addLine(pcl::PointXYZ(0,0,0), nearest, Color(1,0,0), "line_"+std::to_string(clusterId));
 
-        //TODO: 9) Here you can color the vehicles that are both in front and 5 meters away from the ego vehicle
-        //please take a look at the function RenderBox to see how to color the box
-        
+        /*
+            A yellow box is rendered around the cluster if it is less than 5 meters away from ego vehicle (front), a red box is rendered otherwise.
+            A cluster is considered to be in front of the ego vehicle if both x_min and x_max are greater than zero.
+        */ 
+        if(minPt.x > 0 && maxPt.x > 0 && distance <= 5)
+            renderer.RenderBox(box, j, Color(1,1,0));
+        else
+            renderer.RenderBox(box, j, Color(1,0,0));
+
         ++clusterId;
         j++;
     }
