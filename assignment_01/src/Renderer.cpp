@@ -90,6 +90,10 @@ namespace lidar_obstacle_detection
     }
   }
 
+  void Renderer::addLine(const pcl::PointXYZ &pt1, const pcl::PointXYZ &pt2, Color color, std::string id){
+    viewer_->addLine(pt1, pt2, color.r, color.g, color.b, id);
+  }
+
   void Renderer::ClearRays()
   {
     while(rays_counter_ --> 0)

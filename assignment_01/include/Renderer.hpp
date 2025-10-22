@@ -57,6 +57,8 @@ namespace lidar_obstacle_detection
     void RenderHighway();
 
     void RenderRays(const Eigen::Vector3f& origin, const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud);
+
+    void addLine(const pcl::PointXYZ &pt1, const pcl::PointXYZ &pt2, Color color, std::string id);
     
     void addCircle(float centroid_x, float centroid_y, int id);
     

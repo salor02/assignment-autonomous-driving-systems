@@ -229,14 +229,37 @@ void cluster_extraction(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, std::vector<
 
 }
 
-float distance_from_ego(const Box &box){
-    float x = std::min(abs(box.x_min), abs(box.x_max));
-    float y = std::min(abs(box.y_min), abs(box.y_max));
-    float z = std::min(abs(box.z_min), abs(box.z_max));
-
-    float distance = sqrt(pow(x, 2) + pow(y, 2) + pow(z,2));
+// computes the distance of a point wrt ego vehicle
+float distance_from_ego(pcl::PointXYZ point){
+    float distance = sqrt(pow(point.x, 2) + pow(point.y, 2) + pow(point.z,2));
 
     return distance;
+}
+
+/* 
+    Given a box representing a cluster, this gets the nearest box vertex to that cluster.
+    Please note that this function considers that the ego vehicle is in the position <0,0,0>, this is the reason why abs() is used.
+    Please note that this function computes the nearest point among the vertices only.
+*/
+pcl::PointXYZ get_nearest_point(const Box &box){
+    pcl::PointXYZ nearest;
+
+    if(abs(box.x_min) <= abs(box.x_max))
+        nearest.x = box.x_min;
+    else
+        nearest.x = box.x_max;
+
+    if(abs(box.y_min) <= abs(box.y_max))
+        nearest.y = box.y_min;
+    else
+        nearest.y = box.y_max;
+
+    if(abs(box.z_min) <= abs(box.z_max))
+        nearest.z = box.z_min;
+    else
+        nearest.z = box.z_max;
+
+    return nearest;
 }
 
 // renders clusters and boxes around them
@@ -272,11 +295,10 @@ void render_clusters(Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::Ptr& cl
         };
         renderer.RenderBox(box, j);
 
-        //TODO: 8) Here you can plot the distance of each cluster w.r.t ego vehicle
-        
-        renderer.addText(minPt.x, minPt.y, minPt.z,std::to_string(distance_from_ego(box)));
+        pcl::PointXYZ nearest = get_nearest_point(box);
+        renderer.addText(minPt.x, minPt.y, minPt.z,std::to_string(distance_from_ego(nearest)));
+        renderer.addLine(pcl::PointXYZ(0,0,0), nearest, Color(1,0,0), "line_"+std::to_string(clusterId));
 
-        
         //TODO: 9) Here you can color the vehicles that are both in front and 5 meters away from the ego vehicle
         //please take a look at the function RenderBox to see how to color the box
         
