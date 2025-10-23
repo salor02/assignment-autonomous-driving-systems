@@ -23,9 +23,16 @@ namespace fs = boost::filesystem;
 
 using namespace lidar_obstacle_detection;
 
+// different settings mainly for debugging purpose
 #define USE_PCL_LIBRARY
+// #define RENDER_CLOUD
+#define RENDER_CLOUDPLANE
+// #define RENDER_CLOUDFILTERED
+#define RENDER_UNKNOWN_CLUSTERS
 
 typedef std::unordered_set<int> my_visited_set_t;
+
+enum CLUSTER_TYPE {UNKNOWN, CAR, BIKE, PEDESTRIAN, TRUCK};
 
 // downsapling parameters
 const static float LEAF_X = 0.1;
@@ -33,14 +40,13 @@ const static float LEAF_Y = 0.1;
 const static float LEAF_Z = 0.1;
 
 // RANSAC segmentation parameters
-const static double PLANE_DIST_TRESHOLD = 0.1;
+const static double PLANE_DIST_TRESHOLD = 0.2;
 const static double SEGMENTATION_TRESHOLD = 0.6;
 
 // clustering parameters
 const static double CLUSTER_TOLERANCE = 0.2;
 const static int MIN_CLUSTER_SIZE = 100;
-const static int MAX_CLUSTER_SIZE = 25000;
-
+const static int MAX_CLUSTER_SIZE = 2000;
 
 // sets up the custom kdtree using the point cloud
 void setupKdtree(typename pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, my_pcl::KdTree* tree, int dimension){
@@ -189,7 +195,9 @@ void RANSAC_segmentation(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, pcl::PointC
         extract.setInputCloud(cloud); 
         extract.setIndices(inliers);
         extract.setNegative(false);
-        extract.filter(*cloud_plane);
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_plane_current(new pcl::PointCloud<pcl::PointXYZ>());
+        extract.filter(*cloud_plane_current);
+        *cloud_plane += *cloud_plane_current; 
         std::cerr << "PointCloud representing the planar component: " << cloud_plane->width * cloud_plane->height << " data points." << std::endl;
         extract.setNegative(true);
         extract.filter(*cloud);
@@ -227,6 +235,20 @@ void cluster_extraction(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, std::vector<
 
     std::cerr << "Clusters correctly extraxted: " << cluster_indices.size() << std::endl;
 
+}
+
+// categorizes clusters based on the bounding box dimension
+CLUSTER_TYPE cluster_classification(Box &box){
+    float width = abs(box.y_max - box.y_min);
+    float length = abs(box.x_max - box.x_min);
+    float height = abs(box.z_max - box.z_min);
+
+    if(height > 0.7 && height < 1.8 && length/width > 0.8 && length/width < 1.2 && width < 1.0 && width > 0.3) return PEDESTRIAN;
+    if(height > 1.0 && height < 1.5 && length/width > 1.5 && length/width < 3.0 && width < 0.8 && width > 0.5) return BIKE;
+    if(height > 1.5 && height < 6.0 && length > 2.5 && length < 10.0 && width < 5.0 && width > 1.5) return TRUCK;
+    if(height > 0.9 && height < 1.8 && length > 1.0 && length < 5.0 && width < 3.0 && width > 1.5) return CAR;
+
+    return UNKNOWN;
 }
 
 // computes the distance of a point wrt ego vehicle
@@ -271,8 +293,9 @@ void render_clusters(Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::Ptr& cl
         The following lines do:
             1. iteration over cluster indices. Each one represents a single cluster
             2. iterarion over the points belonging to one same cluster
-            3. each of these point is pushed in a new cloud, representing the current cluster
-            4. rendering of the cluster and a box around it
+            3. each of these point is pushed into a new cloud, representing the current cluster
+            4. classification of the cluster and possibly filter it out
+            5. rendering of the cluster and the box around it
     */
     for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
     {
@@ -282,9 +305,6 @@ void render_clusters(Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::Ptr& cl
         cloud_cluster->width = cloud_cluster->size ();
         cloud_cluster->height = 1;
         cloud_cluster->is_dense = true;
-        
-        // rendering of the cloud representing the cluster
-        renderer.RenderPointCloud(cloud_cluster,"cluster_"+std::to_string(clusterId),Color(0,0,1));
 
         pcl::PointXYZ minPt, maxPt;
         pcl::getMinMax3D(*cloud_cluster, minPt, maxPt);
@@ -293,21 +313,57 @@ void render_clusters(Renderer& renderer, pcl::PointCloud<pcl::PointXYZ>::Ptr& cl
             maxPt.x, maxPt.y, maxPt.z
         };
 
-        // rendering of the cluster distance from ego vehicle
-        pcl::PointXYZ nearest = get_nearest_point(box);
-        float distance = distance_from_ego(nearest);
-        renderer.addText(minPt.x, minPt.y, minPt.z,std::to_string(distance));
-        renderer.addLine(pcl::PointXYZ(0,0,0), nearest, Color(1,0,0), "line_"+std::to_string(clusterId));
+        CLUSTER_TYPE cluster_type = cluster_classification(box);
+
+        if(cluster_type == UNKNOWN){
+            #ifdef RENDER_UNKNOWN_CLUSTERS
+                renderer.RenderBox(box, j, Color(1,1,1));
+                renderer.RenderPointCloud(cloud_cluster,"cluster_"+std::to_string(clusterId),Color(0,0,1));
+                ++clusterId;
+                j++;
+            #endif
+            continue;
+        }
 
         /*
-            A yellow box is rendered around the cluster if it is less than 5 meters away from ego vehicle (front), a red box is rendered otherwise.
+            A red box is rendered around the cluster if it is less than 5 meters away from ego vehicle (front).
             A cluster is considered to be in front of the ego vehicle if both x_min and x_max are greater than zero.
-        */ 
-        if(minPt.x > 0 && maxPt.x > 0 && distance <= 5)
-            renderer.RenderBox(box, j, Color(1,1,0));
-        else
-            renderer.RenderBox(box, j, Color(1,0,0));
+            Different colors distinguish clusters belonging to different classes:
+                - PEDESTRIANS are cyan
+                - BIKES are pink
+                - CARS are yellow
+                - TRUCK are green
+        */
+        
+        pcl::PointXYZ nearest = get_nearest_point(box);
+        float distance = distance_from_ego(nearest);
 
+        if(minPt.x > 0 && maxPt.x > 0 && distance <= 5)
+            renderer.RenderBox(box, j, Color(1,0,0));
+        else{
+            switch(cluster_type){
+                case PEDESTRIAN:
+                    renderer.RenderBox(box, j, Color(0,1,1));
+                    break;
+                case BIKE:
+                    renderer.RenderBox(box, j, Color(1,0,1));
+                    break;
+                case CAR:
+                    renderer.RenderBox(box, j, Color(1,1,0));
+                    break;
+                case TRUCK:
+                    renderer.RenderBox(box, j, Color(0,1,0));
+                    break;
+            }
+        }
+        
+        // rendering of the cloud representing the cluster
+        renderer.RenderPointCloud(cloud_cluster,"cluster_"+std::to_string(clusterId),Color(0,0,1));
+
+        // rendering of the cluster distance from ego vehicle
+        renderer.addText(minPt.x, minPt.y, minPt.z,std::to_string(distance));
+        renderer.addLine(pcl::PointXYZ(0,0,0), nearest, Color(1,0,0), "line_"+std::to_string(clusterId));
+  
         ++clusterId;
         j++;
     }
@@ -330,9 +386,15 @@ void ProcessAndRenderPointCloud (Renderer& renderer, pcl::PointCloud<pcl::PointX
 
     render_clusters(renderer, cloud_filtered, cluster_indices);
     
-    renderer.RenderPointCloud(cloud_plane,"cloud_plane", Color(0,1,0));
-    // renderer.RenderPointCloud(cloud_filtered,"cloud_filtered", Color(0,0,1));
-    // renderer.RenderPointCloud(cloud,"cloud", Color(0,0,1));
+    #ifdef RENDER_CLOUDPLANE
+        renderer.RenderPointCloud(cloud_plane,"cloud_plane", Color(0,1,0));
+    #endif
+    #ifdef RENDER_CLOUDFILTERED
+        renderer.RenderPointCloud(cloud_filtered,"cloud_filtered", Color(0,0,1));
+    #endif
+    #ifdef RENDER_CLOUD
+        renderer.RenderPointCloud(cloud,"cloud", Color(0,0,1));
+    #endif
 }
 
 int main(int argc, char* argv[])
@@ -375,8 +437,6 @@ int main(int argc, char* argv[])
         if(streamIterator == stream.end())
             streamIterator = stream.begin();
 
-        renderer.SpinViewerOnce();
-
-        usleep(1000 * 50); //debug
+        renderer.SpinViewerOnce(100);
     }
 }

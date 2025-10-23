@@ -15,7 +15,6 @@
 #include <vector>
 #include <string>
 
-
 namespace lidar_obstacle_detection
 {
 
@@ -84,7 +83,7 @@ namespace lidar_obstacle_detection
 
     bool WasViewerStopped() const;
 
-    void SpinViewerOnce() const;
+    void SpinViewerOnce(int time = 1) const;
 
   };
 }
