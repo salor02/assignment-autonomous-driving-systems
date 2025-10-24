@@ -43,6 +43,8 @@ The following functionalities have been implemented in the code:
 - **Signal when a cluster is too close to the ego vehicle**. This function takes the distance computed at the previous step and simply draws a red bounding box around the cluster if it's too close to the ego vehicle. The threshold distance has been set to 5 meters.
 - **Cluster classification**. This function has been implemented primarily for the purpose of the stress test on dataset 2, but it probably works better on dataset 1. This function aims to categorize each cluster into 4 different classes: *pedestrian, bike, car and truck*. The classification is executed based on the dimension of the cluster (see *cluster_classification* for further details).
 
+![Frame of algorithm running on dataset 1](./screen-dataset-1.png "Dataset 1")
+
 ### Stress test on dataset 2
 This dataset is characterized by a way richer environment compared to dataset 1. Using a simple clustering approach without any type of filtering, each object composed of at least *MIN_CLUSTER_SIZE* points and a maximum of *MAX_CLUSTER_SIZE* points is considered to be a cluster. In particular, in this dataset several objects appear: streetlamps, road signs, raised traffic islands, stakes, walls and buildings.
 The cluster classification function aims to filter out these unwanted objects in order to keep only the clusters that represent a vehicle, a pedestrian or a bike. This filtering mechanism has been implemented taking into consideration just the dimension of the bounding box rendered around the cluster.
@@ -52,6 +54,8 @@ For example, a cluster whose height is less than 2.0 meters and whose width and 
 "Probably" is the right keyword here, since with this approach the algorithm still finds a lot of false positives and/or confuses the different classes of clusters. Actually, it's pretty hard to distinguish a truck from a wall based only on dimensions, and a hybrid approach using also a camera should be implemented to achieve an (almost) perfect classification.
 
 By the way, by running the program on dataset 2, it's possible to see that the algorithm finds the bike in front of the vehicle and tracks it pretty well during the whole scene (although sometimes confusing it with a pedestrian). The truck that appears on the right of the vehicle seems to be tracked as well. The same goes for the cars parked on the sides of the road at the end of the scene. All clusters that are classified as "*UNKNOWN*" are rendered with a white bounding box but this behavior could be changed by commenting the compiler directive *RENDER_UNKNOWN_CLUSTERS*.
+
+![Frame of algorithm running on dataset 2](./screen-dataset-2.png "Dataset 2")
 
 ## Instructions to compile the code:
 ```bash

@@ -246,7 +246,7 @@ CLUSTER_TYPE cluster_classification(Box &box){
     if(height > 0.7 && height < 1.8 && length/width > 0.8 && length/width < 1.2 && width < 1.0 && width > 0.3) return PEDESTRIAN;
     if(height > 1.0 && height < 1.5 && length/width > 1.5 && length/width < 3.0 && width < 0.8 && width > 0.5) return BIKE;
     if(height > 1.5 && height < 6.0 && length > 2.5 && length < 10.0 && width < 5.0 && width > 1.5) return TRUCK;
-    if(height > 0.9 && height < 1.8 && length > 1.0 && length < 5.0 && width < 3.0 && width > 1.5) return CAR;
+    if(height > 0.9 && height < 1.8 && length > 1.0 && length < 5.0 && width < 3.0 && width > 1.0) return CAR;
 
     return UNKNOWN;
 }
