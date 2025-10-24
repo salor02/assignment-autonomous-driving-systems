@@ -90,6 +90,10 @@ namespace lidar_obstacle_detection
     }
   }
 
+  void Renderer::addLine(const pcl::PointXYZ &pt1, const pcl::PointXYZ &pt2, Color color, std::string id){
+    viewer_->addLine(pt1, pt2, color.r, color.g, color.b, id);
+  }
+
   void Renderer::ClearRays()
   {
     while(rays_counter_ --> 0)
@@ -103,7 +107,7 @@ namespace lidar_obstacle_detection
   {
 
     viewer_->addPointCloud<pcl::PointXYZ>(cloud, name);
-    viewer_->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 4, name);
+    viewer_->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, name);
     viewer_->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, color.r, color.g, color.b, name);
   }
 
@@ -241,8 +245,8 @@ namespace lidar_obstacle_detection
 
   }
 
-  void Renderer::SpinViewerOnce() const
+  void Renderer::SpinViewerOnce(int time) const
   {
-    viewer_->spinOnce();
+    viewer_->spinOnce(time);
   }
 }

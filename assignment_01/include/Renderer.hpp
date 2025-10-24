@@ -15,7 +15,6 @@
 #include <vector>
 #include <string>
 
-
 namespace lidar_obstacle_detection
 {
 
@@ -57,6 +56,8 @@ namespace lidar_obstacle_detection
     void RenderHighway();
 
     void RenderRays(const Eigen::Vector3f& origin, const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud);
+
+    void addLine(const pcl::PointXYZ &pt1, const pcl::PointXYZ &pt2, Color color, std::string id);
     
     void addCircle(float centroid_x, float centroid_y, int id);
     
@@ -82,7 +83,7 @@ namespace lidar_obstacle_detection
 
     bool WasViewerStopped() const;
 
-    void SpinViewerOnce() const;
+    void SpinViewerOnce(int time = 1) const;
 
   };
 }
