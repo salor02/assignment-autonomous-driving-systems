@@ -437,6 +437,6 @@ int main(int argc, char* argv[])
         if(streamIterator == stream.end())
             streamIterator = stream.begin();
 
-        renderer.SpinViewerOnce(100);
+        renderer.SpinViewerOnce();
     }
 }
