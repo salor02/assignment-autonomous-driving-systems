@@ -50,22 +50,23 @@ void Tracker::addTracks(const std::vector<bool> &associated_detections, const st
 */
 void Tracker::dataAssociation(std::vector<bool> &associated_detections, const std::vector<double> &centroids_x, const std::vector<double> &centroids_y)
 {
-
     //Remind this vector contains a pair of tracks and its corresponding
     associated_track_det_ids_.clear();
 
     for (size_t i = 0; i < tracks_.size(); ++i)
     {
-
         int closest_point_id = -1;
         double min_dist = std::numeric_limits<double>::max();
 
         for (size_t j = 0; j < associated_detections.size(); ++j)
         {
-            // TODO
             // Implement logic to find the closest detection (centroids_x,centroids_y) 
             // to the current track (tracks_) 
-            
+            double dist = sqrt(pow((centroids_x[j] - tracks_[i].getX()),2) + pow((centroids_y[j] - tracks_[i].getY()),2));
+            if(dist < min_dist){
+                min_dist = dist;
+                closest_point_id = j;
+            }
         }
 
         // Associate the closest detection to a tracklet
@@ -86,9 +87,13 @@ void Tracker::track(const std::vector<double> &centroids_x,
 
     // TODO: Predict the position
     //For each track --> Predict the position of the tracklets
+    for (size_t i = 0; i < tracks_.size(); ++i){
+        tracks_[i].predict();
+    }
     
     // TODO: Associate the predictions with the detections
-
+    dataAssociation(associated_detections, centroids_x, centroids_y);
+    
     // Update tracklets with the new detections
     for (int i = 0; i < associated_track_det_ids_.size(); ++i)
     {

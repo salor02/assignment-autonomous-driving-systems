@@ -69,9 +69,6 @@ void KalmanFilter::predict()
 
 void KalmanFilter::update(const Eigen::VectorXd &z)
 {
-  // TODO
-  // Implement Kalman Filter Update
-
   Eigen::VectorXd y = z - H_ * x_;
   Eigen::MatrixXd S = H_ * P_ * H_.transpose() + R_;
   Eigen::MatrixXd K = P_ * H_.transpose() * S.inverse();
