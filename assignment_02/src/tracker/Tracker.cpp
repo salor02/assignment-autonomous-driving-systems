@@ -3,9 +3,9 @@
 Tracker::Tracker()
 {
     cur_id_ = 0;
-    distance_threshold_ = 0.0; // meters
-    covariance_threshold = 0.0; 
-    loss_threshold = 0; //number of frames the track has not been seen
+    distance_threshold_ = 2.0; // meters
+    covariance_threshold = 1.0; 
+    loss_threshold = 10; //number of frames the track has not been seen
 }
 Tracker::~Tracker()
 {
@@ -20,12 +20,14 @@ void Tracker::removeTracks()
 
     for (size_t i = 0; i < tracks_.size(); ++i)
     {
-        // TODO
         // Implement logic to discard old tracklets
         // logic_to_keep is a dummy placeholder to make the code compile and should be subsituted with the real condition
-        bool logic_to_keep = true;
-        if (logic_to_keep)
-            tracks_to_keep.push_back(tracks_[i]);
+        if(tracks_[i].getLossCount() > loss_threshold)
+            continue;
+        if(tracks_[i].getXCovariance() > covariance_threshold || tracks_[i].getYCovariance() > covariance_threshold)
+            continue;
+            
+        tracks_to_keep.push_back(tracks_[i]);
     }
 
     tracks_.swap(tracks_to_keep);
@@ -93,7 +95,7 @@ void Tracker::track(const std::vector<double> &centroids_x,
     
     // TODO: Associate the predictions with the detections
     dataAssociation(associated_detections, centroids_x, centroids_y);
-    
+
     // Update tracklets with the new detections
     for (int i = 0; i < associated_track_det_ids_.size(); ++i)
     {
@@ -103,6 +105,8 @@ void Tracker::track(const std::vector<double> &centroids_x,
     }
 
     // TODO: Remove dead tracklets
+    removeTracks();
 
     // TODO: Add new tracklets
+    addTracks(associated_detections, centroids_x, centroids_y);
 }
