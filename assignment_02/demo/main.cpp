@@ -12,7 +12,7 @@ int main(int argc, char *argv[])
         std::cerr << "No arguments provided. Exiting." << std::endl;
         return 1;
     }
-    std::string log_path = argv[1];  // TODO: define the path to the log folder
+    std::string log_path = argv[1];
 
     std::ifstream dataFile(log_path, std::ios::in | std::ios::binary);
     if (!dataFile)
