@@ -2,6 +2,7 @@
 #define TRACKER_H_
 
 #include "tracker/Tracklet.h"
+#include "viewer/Renderer.h"
 #include <limits>
 
 class Tracker
@@ -28,6 +29,10 @@ public:
 
   // getters
   const std::vector<Tracklet> &getTracks() { return tracks_; }
+  std::pair<int, double> getLongestTracklet() {return longest_path_; }
+  viewer::Box getTrackedArea() {return area_; }
+  int getAreaCount();
+  std::pair<int, int> getLongestTrackInArea();
 
 private:
   // tracklets
@@ -41,6 +46,13 @@ private:
   double distance_threshold_;
   double covariance_threshold;
   int loss_threshold;
+
+  //memorize the id and length of longest path
+  std::pair<int, double> longest_path_;
+
+  //useful for counting people entering in a defined area
+  viewer::Box area_;
+  std::vector<int> area_tracks_frames_;
 };
 
 #endif // TRACKER_H_

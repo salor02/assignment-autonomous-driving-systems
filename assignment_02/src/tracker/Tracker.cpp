@@ -9,6 +9,14 @@ Tracker::Tracker()
     distance_threshold_ = 0.4; // meters
     covariance_threshold = 5.0; 
     loss_threshold = 30; //number of frames the track has not been seen
+
+    // area size definition. Clusters that enter this area will be counted.
+    area_.x_min=-1.5;
+    area_.y_min=-1.5;
+    area_.z_min=0;
+    area_.x_max=1.5;
+    area_.y_max=1.5;
+    area_.z_max=0;
 }
 Tracker::~Tracker()
 {
@@ -48,8 +56,11 @@ void Tracker::addTracks(const std::vector<bool> &associated_detections, const st
 {
     // Adding not associated detections (meaning that the detection is new and represents its own tracklet)
     for (size_t i = 0; i < associated_detections.size(); ++i)
-        if (!associated_detections[i])
+        if (!associated_detections[i]){
             tracks_.push_back(Tracklet(cur_id_++, centroids_x[i], centroids_y[i]));
+            // each time a new tracklet is created a new counter it is initialized in order to count the number of frames this tracklet will be within the area
+            area_tracks_frames_.push_back(0);
+        }
 }
 
 /*
@@ -96,6 +107,21 @@ void Tracker::dataAssociation(std::vector<bool> &associated_detections, const st
     }
 }
 
+
+/*  A tracklet is considered to be "entered in the area" if the number of frames it spends within the area is greater than zero */
+int Tracker::getAreaCount(){
+    return area_tracks_frames_.size() - std::count(area_tracks_frames_.begin(), area_tracks_frames_.end(), 0);
+}
+
+/*  Gets the tracklet which spent most time in the area */
+std::pair<int,int> Tracker::getLongestTrackInArea(){
+    auto max_frames_it = std::max_element(area_tracks_frames_.begin(), area_tracks_frames_.end());
+    int track_id = std::distance(area_tracks_frames_.begin(), max_frames_it);
+    int max_value = *max_frames_it;
+
+    return std::pair<int,int>(track_id, max_value);
+}
+
 void Tracker::track(const std::vector<double> &centroids_x,
                     const std::vector<double> &centroids_y,
                     bool lidarStatus)
@@ -106,9 +132,9 @@ void Tracker::track(const std::vector<double> &centroids_x,
     // For each track --> Predict the position of the tracklets
     for (size_t i = 0; i < tracks_.size(); ++i){
         tracks_[i].predict();
-        std::cerr<<"[" + std::to_string(tracks_[i].getId()) + "]" + std::to_string(tracks_[i].getXCovariance()) + " " + std::to_string(tracks_[i].getYCovariance()) +";";
+        // std::cerr<<"[" + std::to_string(tracks_[i].getId()) + "]" + std::to_string(tracks_[i].getXCovariance()) + " " + std::to_string(tracks_[i].getYCovariance()) +";";
     }
-    std::cerr<<std::endl;
+    // std::cerr<<std::endl;
     
     // Associate the predictions with the detections
     dataAssociation(associated_detections, centroids_x, centroids_y);
@@ -119,6 +145,18 @@ void Tracker::track(const std::vector<double> &centroids_x,
         auto det_id = associated_track_det_ids_[i].first;
         auto track_id = associated_track_det_ids_[i].second;
         tracks_[track_id].update(centroids_x[det_id], centroids_y[det_id], lidarStatus);
+
+        // updates longest tracklet
+        if(tracks_[track_id].getLength() > longest_path_.second){
+            longest_path_.first = tracks_[track_id].getId();
+            longest_path_.second = tracks_[track_id].getLength();
+        }
+
+        // records a new frame if the tracklet is currently within the area
+        if(tracks_[track_id].getX() >= area_.x_min && tracks_[track_id].getX() <= area_.x_max &&
+            tracks_[track_id].getY() >= area_.y_min && tracks_[track_id].getY() <= area_.y_max){
+                area_tracks_frames_[tracks_[track_id].getId()] += 1;
+        }
     }
 
     // Remove dead tracklets

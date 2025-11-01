@@ -55,6 +55,8 @@ int main(int argc, char *argv[])
         renderer.renderPointCloud(cloud, "pointCloud", color);
         for (size_t i = 0; i < boxes.size(); ++i)
             renderer.renderBox(boxes[i], i);
+        //render predefined area for object counting
+        renderer.renderBox(tracker.getTrackedArea(), -1, viewer::Color(0,1,0));
 
         // Call the tracker on the detected clusters
         tracker.track(centroids_x, centroids_y, renderer.getLidarStatus());
@@ -66,6 +68,10 @@ int main(int argc, char *argv[])
             renderer.addCircle(tracks[i].getX(), tracks[i].getY(), tracks[i].getId());
             renderer.addText(tracks[i].getX() + 0.01, tracks[i].getY() + 0.01, tracks[i].getId());
         }
+
+        printf("Current longest path: [TRACKLET ID %d] %.5fm\n", tracker.getLongestTracklet().first, tracker.getLongestTracklet().second);
+        printf("Total number of people entered in the area: %d\n", tracker.getAreaCount());
+        printf("Current longest time object in area: [TRACKLET ID %d] %dms\n", tracker.getLongestTrackInArea().first, tracker.getLongestTrackInArea().second * freq);
 
         renderer.spinViewerOnce();
     }
