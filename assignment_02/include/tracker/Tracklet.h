@@ -20,6 +20,8 @@ public:
   double getY() { return kf_.getY(); }
   double getXCovariance() { return kf_.getXCovariance(); }
   double getYCovariance() { return kf_.getYCovariance(); }
+  double getVelX() { return kf_.getVelX(); }
+  double getVelY() { return kf_.getVelY(); }
   int getLossCount() { return loss_count_; }
   int getId() { return id_; }
   double getLength() { return length_; }

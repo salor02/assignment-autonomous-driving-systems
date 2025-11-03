@@ -6,7 +6,7 @@
 
 int main(int argc, char *argv[])
 {
-    int64_t freq = 100;            // Frequency of the thread dedicated to process the point cloud
+    int64_t freq = 5;            // Frequency of the thread dedicated to process the point cloud
 
     if(argc < 2){
         std::cerr << "No arguments provided. Exiting." << std::endl;
@@ -69,9 +69,9 @@ int main(int argc, char *argv[])
             renderer.addText(tracks[i].getX() + 0.01, tracks[i].getY() + 0.01, tracks[i].getId());
         }
 
-        printf("Current longest path: [TRACKLET ID %d] %.5fm\n", tracker.getLongestTracklet().first, tracker.getLongestTracklet().second);
-        printf("Total number of people entered in the area: %d\n", tracker.getAreaCount());
-        printf("Current longest time object in area: [TRACKLET ID %d] %dms\n", tracker.getLongestTrackInArea().first, tracker.getLongestTrackInArea().second * freq);
+        // printf("Current longest path: [TRACKLET ID %d] %.5fm\n", tracker.getLongestTracklet().first, tracker.getLongestTracklet().second);
+        // printf("Total number of people entered in the area: %d\n", tracker.getAreaCount());
+        // printf("Current longest time object in area: [TRACKLET ID %d] %dms\n", tracker.getLongestTrackInArea().first, tracker.getLongestTrackInArea().second * freq);
 
         renderer.spinViewerOnce();
     }

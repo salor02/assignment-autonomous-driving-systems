@@ -17,8 +17,8 @@ void KalmanFilter::init(double dt)
 
   // Initialize the state covariance matrix P
   P_ = Eigen::MatrixXd(4, 4);
-  P_ << 0.0225, 0., 0., 0.,
-      0., 0.0225, 0., 0.,
+  P_ << 0.2, 0., 0., 0.,
+      0., 0.2, 0., 0.,
       0., 0., 100., 0.,
       0., 0., 0., 100.;
 

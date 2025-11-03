@@ -6,7 +6,7 @@
 Tracker::Tracker()
 {
     cur_id_ = 0;
-    distance_threshold_ = 0.4; // meters
+    distance_threshold_ = 1.0; // meters
     covariance_threshold = 5.0; 
     loss_threshold = 30; //number of frames the track has not been seen
 
@@ -132,9 +132,9 @@ void Tracker::track(const std::vector<double> &centroids_x,
     // For each track --> Predict the position of the tracklets
     for (size_t i = 0; i < tracks_.size(); ++i){
         tracks_[i].predict();
-        // std::cerr<<"[" + std::to_string(tracks_[i].getId()) + "]" + std::to_string(tracks_[i].getXCovariance()) + " " + std::to_string(tracks_[i].getYCovariance()) +";";
+        std::cerr<<"[" + std::to_string(tracks_[i].getId()) + "]" + std::to_string(tracks_[i].getVelX()) + " " + std::to_string(tracks_[i].getVelY()) +";";
     }
-    // std::cerr<<std::endl;
+    std::cerr<<std::endl;
     
     // Associate the predictions with the detections
     dataAssociation(associated_detections, centroids_x, centroids_y);
