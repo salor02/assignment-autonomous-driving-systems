@@ -22,6 +22,7 @@ public:
   double getYCovariance() { return kf_.getYCovariance(); }
   double getVelX() { return kf_.getVelX(); }
   double getVelY() { return kf_.getVelY(); }
+  double getYaw() { return kf_.getYaw(); }
   int getLossCount() { return loss_count_; }
   int getId() { return id_; }
   double getLength() { return length_; }

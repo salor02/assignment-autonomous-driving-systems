@@ -132,7 +132,7 @@ void Tracker::track(const std::vector<double> &centroids_x,
     // For each track --> Predict the position of the tracklets
     for (size_t i = 0; i < tracks_.size(); ++i){
         tracks_[i].predict();
-        std::cerr<<"[" + std::to_string(tracks_[i].getId()) + "]" + std::to_string(tracks_[i].getVelX()) + " " + std::to_string(tracks_[i].getVelY()) +";";
+        std::cerr<<"[" + std::to_string(tracks_[i].getId()) + "]" + std::to_string(tracks_[i].getYaw()) + " " + std::to_string(tracks_[i].getVelY()) +";";
     }
     std::cerr<<std::endl;
     

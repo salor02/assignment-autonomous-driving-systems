@@ -13,14 +13,15 @@ void KalmanFilter::init(double dt)
   dt_ = dt;
 
   // create a 4D state vector
-  x_ = Eigen::VectorXd(4);
+  x_ = Eigen::VectorXd(5);
 
   // Initialize the state covariance matrix P
-  P_ = Eigen::MatrixXd(4, 4);
-  P_ << 0.2, 0., 0., 0.,
-      0., 0.2, 0., 0.,
-      0., 0., 100., 0.,
-      0., 0., 0., 100.;
+  P_ = Eigen::MatrixXd(5, 5);
+  P_ << 0.2, 0., 0., 0., 0.,
+      0., 0.2, 0., 0., 0.,
+      0., 0., 100., 0., 0.,
+      0., 0., 0., 100., 0.,
+      0., 0., 0., 0, 100.;
 
   // measurement covariance (this matrix indicates that sensor data <x,y> has no relation between them)
   R_ = Eigen::MatrixXd(2, 2);
@@ -31,20 +32,22 @@ void KalmanFilter::init(double dt)
       The 1's indicate that the measured relative position is directly related to 
       the absolute position of the object
   */
-  H_ = Eigen::MatrixXd(2, 4);
-  H_ << 1., 0., 0., 0.,
-      0., 1., 0., 0.;
+  H_ = Eigen::MatrixXd(2, 5);
+  H_ << 1., 0., 0., 0., 0.,
+      0., 1., 0., 0., 0.;
 
   // the transition matrix F (constant velocity motion model it's assumed in this case)
-  F_ = Eigen::MatrixXd(4, 4);
-  F_ << 1., 0., dt_, 0.,
-      0., 1., 0., dt_,
-      0., 0., 1., 0.,
-      0., 0., 0., 1.;
+  F_ = Eigen::MatrixXd(5, 5);
+  F_ << 1., 0., dt_, 0., 0.,
+      0., 1., 0., dt_, 0.,
+      0., 0., 1., 0., 0.,
+      0., 0., 0., 1., 0.,
+      0., 0., 0., 0., 1.;
 
   // set the acceleration noise components
   double noise_ax_ = 2.;
   double noise_ay_ = 2.;
+  double noise_yaw = 2.;
 
   double dt_2 = dt_ * dt_;
   double dt_3 = dt_2 * dt_;
@@ -54,11 +57,12 @@ void KalmanFilter::init(double dt)
       (Assume that this is a random value that models the stochastic part of 
       the object)
   */
-  Q_ = Eigen::MatrixXd(4, 4);
-  Q_ << dt_4 / 4. * noise_ax_, 0., dt_3 / 2. * noise_ax_, 0.,
-      0., dt_4 / 4. * noise_ay_, 0., dt_3 / 2. * noise_ay_,
-      dt_3 / 2. * noise_ax_, 0., dt_2 * noise_ax_, 0.,
-      0., dt_3 / 2. * noise_ay_, 0., dt_2 * noise_ay_;
+  Q_ = Eigen::MatrixXd(5, 5);
+  Q_ << dt_4 / 4. * noise_ax_, 0., dt_3 / 2. * noise_ax_, 0., 0.,
+      0., dt_4 / 4. * noise_ay_, 0., dt_3 / 2. * noise_ay_, 0.,
+      dt_3 / 2. * noise_ax_, 0., dt_2 * noise_ax_, 0., dt_3 / 2. * noise_ax_,
+      0., dt_3 / 2. * noise_ay_, 0., dt_2 * noise_ay_, dt_3 / 2. * noise_ay_,
+      0., 0., dt_3 / 2. * noise_ax_, dt_3 / 2. * noise_ay_, dt_2 * noise_yaw;
 }
 
 void KalmanFilter::predict()
@@ -81,5 +85,5 @@ void KalmanFilter::update(const Eigen::VectorXd &z)
 
 void KalmanFilter::setState(double x, double y)
 {
-  x_ << x, y, 0., 0.;
+  x_ << x, y, 0., 0., 0.;
 }
