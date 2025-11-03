@@ -23,6 +23,9 @@ public:
   double getYCovariance() { return P_.coeff(1, 1); }
   double getX() { return x_[0]; }
   double getY() { return x_[1]; }
+  double getVelX() { return x_[2]; }
+  double getVelY() { return x_[3]; }
+  double getYaw() { return x_[4]; }
 
 private:
   // dt in seconds

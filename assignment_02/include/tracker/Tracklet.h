@@ -20,8 +20,12 @@ public:
   double getY() { return kf_.getY(); }
   double getXCovariance() { return kf_.getXCovariance(); }
   double getYCovariance() { return kf_.getYCovariance(); }
+  double getVelX() { return kf_.getVelX(); }
+  double getVelY() { return kf_.getVelY(); }
+  double getYaw() { return kf_.getYaw(); }
   int getLossCount() { return loss_count_; }
   int getId() { return id_; }
+  double getLength() { return length_; }
 
 private:
   // filter
@@ -32,6 +36,10 @@ private:
 
   // number of loss since last update
   int loss_count_;
+
+  // tracklet length
+  double length_;
+  void lengthUpdate(double x0, double y0, double x1, double y1);
 };
 
 #endif // TRACKLET_H_
