@@ -6,7 +6,7 @@
 Tracker::Tracker()
 {
     cur_id_ = 0;
-    distance_threshold_ = 1.0; // meters
+    distance_threshold_ = 0.6; // meters
     covariance_threshold = 5.0; 
     loss_threshold = 30; //number of frames the track has not been seen
 
@@ -132,9 +132,9 @@ void Tracker::track(const std::vector<double> &centroids_x,
     // For each track --> Predict the position of the tracklets
     for (size_t i = 0; i < tracks_.size(); ++i){
         tracks_[i].predict();
-        std::cerr<<"[" + std::to_string(tracks_[i].getId()) + "]" + std::to_string(tracks_[i].getYaw()) + " " + std::to_string(tracks_[i].getVelY()) +";";
+        // std::cerr<<"[PREDICTION " + std::to_string(tracks_[i].getId()) + "]" + std::to_string(tracks_[i].getXCovariance()) + " " + std::to_string(tracks_[i].getYCovariance()) +"\t";
     }
-    std::cerr<<std::endl;
+    // std::cerr<<std::endl;
     
     // Associate the predictions with the detections
     dataAssociation(associated_detections, centroids_x, centroids_y);
@@ -145,6 +145,7 @@ void Tracker::track(const std::vector<double> &centroids_x,
         auto det_id = associated_track_det_ids_[i].first;
         auto track_id = associated_track_det_ids_[i].second;
         tracks_[track_id].update(centroids_x[det_id], centroids_y[det_id], lidarStatus);
+        // std::cerr<<"[UPDATE " + std::to_string(tracks_[i].getId()) + "]" + std::to_string(tracks_[i].getXCovariance()) + " " + std::to_string(tracks_[i].getYCovariance()) +"\t";
 
         // updates longest tracklet
         if(tracks_[track_id].getLength() > longest_path_.second){
@@ -158,6 +159,8 @@ void Tracker::track(const std::vector<double> &centroids_x,
                 area_tracks_frames_[tracks_[track_id].getId()] += 1;
         }
     }
+    // std::cerr<<std::endl;
+
 
     // Remove dead tracklets
     removeTracks();

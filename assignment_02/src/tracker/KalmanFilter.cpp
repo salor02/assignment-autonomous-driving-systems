@@ -12,7 +12,7 @@ void KalmanFilter::init(double dt)
 {
   dt_ = dt;
 
-  // create a 4D state vector
+  // create a 5D state vector
   x_ = Eigen::VectorXd(5);
 
   // Initialize the state covariance matrix P
