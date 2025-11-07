@@ -32,20 +32,18 @@ Academic Year: 2024/2025
 		Example: sudo apt install libpcl-dev ros-jazzy-pcl-conversions ros-jazzy-pcl-msgs  (this one applies to Ubuntu 24)        
     
 * Instructions to compile the code:
-        Clean the project:
+        To compile the code run this command in a different terminal (in the src/particle folder): 
             rm -rf build install log
-            
-        Activate the ROS setup for the current session 
             source /opt/ros/jazzy/setup.bash
-        
-        To compile the code run this command in a different terminal (in the src folder): 
             colcon build --symlink-install 
         
         To run the code:
-            . install/setup.bash
+            source install/setup.bash
+            source /opt/ros/jazzy/setup.bash
             ros2 run pf pf_node
 
         As soon as you launch the executable you can start the simulation. To do so, open another terminal and write:
+            source /opt/ros/jazzy/setup.bash
             ros2 bag play data/techboard_log/
 
         The executable generates a file called 'res.txt'

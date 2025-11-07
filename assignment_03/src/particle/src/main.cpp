@@ -165,15 +165,15 @@ int main(int argc,char **argv)
 
     pcl::VoxelGrid<pcl::PointXYZ> vg;
     // Create file with the map info
-    pcl::io::loadPCDFile ("../data/map_reflector.pcd", *cloudReflectors); // cloud with just the reflectors
-    pcl::io::loadPCDFile ("../data/map_pepperl.pcd", *cloudMap); // total cloud (used for rendering)
+    pcl::io::loadPCDFile ("../../../data/map_reflector.pcd", *cloudReflectors); // cloud with just the reflectors
+    pcl::io::loadPCDFile ("../../../data/map_pepperl.pcd", *cloudMap); // total cloud (used for rendering)
 
     remove("./res.txt");
     // This function locates the reflectors within the map and writes into the file
-    createMap(cloudReflectors,"../data/map_data.txt",map_mille);
+    createMap(cloudReflectors,"../../../data/map_data.txt",map_mille);
 
     // Read map data
-    if (!read_map_data("../data/map_data.txt", map_mille)) {
+    if (!read_map_data("../../../data/map_data.txt", map_mille)) {
         cout << "Error: Could not open map file" << endl;
         return -1;
     } 
