@@ -96,9 +96,21 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 *  Associated observations to mapLandmarks (perform the association using the ids)
 */
 void ParticleFilter::dataAssociation(std::vector<LandmarkObs> mapLandmark, std::vector<LandmarkObs>& observations) {
-   //TODO
-   //TIP: Assign to observations[i].id the id of the landmark with the smallest euclidean distance
-
+    //TODO
+    //TIP: Assign to observations[i].id the id of the landmark with the smallest euclidean distance
+    for(LandmarkObs obs : observations){
+        double min_dist = std::numeric_limits<double>::max();
+        int min_id = -1;
+        for(LandmarkObs landmark : mapLandmark){
+            double distance = dist(landmark.x, landmark.y, obs.x, obs.y);
+            if(distance < min_dist){
+                min_dist = distance;
+                min_id = landmark.id;
+            }
+        }
+        obs.id = min_id;
+    }
+    
 }
 
 /*
@@ -114,8 +126,8 @@ LandmarkObs transformation(LandmarkObs observation, Particle p){
     LandmarkObs global;
     
     global.id = observation.id;
-    global.x = -1; //TODO
-    global.y = -1; //TODO
+    global.x = observation.x * cos(p.theta) - observation.y * sin(p.theta) + p.x; //TODO
+    global.y = observation.x * sin(p.theta) + observation.y * cos(p.theta) + p.y; //TODO
 
     return global;
 }
@@ -143,9 +155,13 @@ void ParticleFilter::updateWeights(double std_landmark[],
         // Before applying the association we have to transform the observations in the global coordinates
         std::vector<LandmarkObs> transformed_observations;
         //TODO: for each observation transform it (transformation function)
-        
+        for(LandmarkObs local_obs : observations){
+            transformed_observations.push_back(transformation(local_obs, particles[i]));
+        }
+
         //TODO: perform the data association (associate the landmarks to the observations)
-        
+        dataAssociation(mapLandmark, transformed_observations);
+
         particles[i].weight = 1.0;
         // Compute the probability
 		//The particles final weight can be represented as the product of each measurement’s Multivariate-Gaussian probability density
