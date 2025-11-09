@@ -38,6 +38,13 @@ void ParticleFilter::init(double x, double y, double theta, double std[],int nPa
     normal_distribution<double> dist_theta(-std[2], std[2]);
 
 	//TODO
+    for(int i = 0; i < nParticles; i++){
+        double x = dist_x(gen);
+        double y = dist_y(gen);
+        double theta = dist_theta(gen);
+
+        particles.push_back(Particle(x, y, theta));
+    }
     
     is_initialized=true;
 }
