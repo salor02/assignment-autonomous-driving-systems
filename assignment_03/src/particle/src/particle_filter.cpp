@@ -38,12 +38,8 @@ void ParticleFilter::init(double x, double y, double theta, double std[],int nPa
     normal_distribution<double> dist_theta(-std[2], std[2]);
 
 	//TODO
-    for(int i = 0; i < nParticles; i++){
-        double x = dist_x(gen);
-        double y = dist_y(gen);
-        double theta = dist_theta(gen);
-
-        particles.push_back(Particle(x, y, theta));
+    for(int i = 0; i < num_particles; i++){
+        particles.push_back(Particle(x + dist_x(gen), y + dist_y(gen), theta + dist_theta(gen)));
     }
     
     is_initialized=true;
@@ -62,12 +58,13 @@ void ParticleFilter::init(double x, double y, double theta, double std[],int nPa
 */
 void ParticleFilter::prediction(double delta_t, double std_pos[], double velocity, double yaw_rate) {
     //for each particle
-    for(Particle particle : particles){
+    for(Particle& particle : particles){
         double x,y,theta;
         if (fabs(yaw_rate) < 0.00001) {
             //TODO
             x = particle.x + velocity * delta_t * cos(particle.theta);
             y = particle.y + velocity * delta_t * sin(particle.theta);
+            theta = particle.theta;
         }else{ 
             //TODO
             x = particle.x + (velocity/yaw_rate) * (sin(particle.theta + yaw_rate * delta_t) - sin(particle.theta));
@@ -98,7 +95,7 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 void ParticleFilter::dataAssociation(std::vector<LandmarkObs> mapLandmark, std::vector<LandmarkObs>& observations) {
     //TODO
     //TIP: Assign to observations[i].id the id of the landmark with the smallest euclidean distance
-    for(LandmarkObs obs : observations){
+    for(LandmarkObs& obs : observations){
         double min_dist = std::numeric_limits<double>::max();
         int min_id = -1;
         for(LandmarkObs landmark : mapLandmark){
@@ -181,7 +178,7 @@ void ParticleFilter::updateWeights(double std_landmark[],
             double w = exp( -( pow(l_x-obs_x,2)/(2*pow(std_landmark[0],2)) + pow(l_y-obs_y,2)/(2*pow(std_landmark[1],2)) ) ) / ( 2*M_PI*std_landmark[0]*std_landmark[1] );
             particles[i].weight *= w;
         }
-
+        std::cout<<particles[i].weight<<endl;
     }    
 }
 
