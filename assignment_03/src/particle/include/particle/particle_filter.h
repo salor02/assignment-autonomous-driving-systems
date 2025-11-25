@@ -58,11 +58,11 @@ public:
 		/**
 	 * init Initializes particle filter by randomly distributing the particles 
 	 * around the map.
-	 * @param std[] Array of dimension 3 [standard deviation of x [m], standard deviation of y [m]
-	 *   standard deviation of yaw [rad]]
 	 * @param nParticles Number of particles used by the algorithm
+	 * @param min_pt Point <x,y> whose coords are the lowest among cloudReflector points
+	 * @param max_pt Point <x,y> whose coords are the greatest among cloudReflector points	 
 	 */
-	void init_random(double std[],int nParticles);
+	void init_random(int nParticles, std::pair<float, float> min_pt, std::pair<float, float> max_pt);
 
 
 	/**

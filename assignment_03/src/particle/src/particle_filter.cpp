@@ -21,8 +21,16 @@ static  default_random_engine gen;
 *  std - noise that might be added to the position
 *  nParticles - number of particles
 */
-void ParticleFilter::init_random(double std[],int nParticles) {
+void ParticleFilter::init_random(int nParticles, std::pair<float, float> min_pt, std::pair<float, float> max_pt) {
+    num_particles = nParticles;
+    uniform_real_distribution<double> dist_x(min_pt.first, max_pt.first);
+    uniform_real_distribution<double> dist_y(min_pt.second, max_pt.second);
+    normal_distribution<double> dist_theta(0, 2 * M_PI);
 
+    for(int i=0; i < num_particles; i++){
+        particles.push_back(Particle(dist_x(gen), dist_y(gen), dist_theta(gen))); 
+    }
+    is_initialized=true;
 }
 
 /*
@@ -190,7 +198,6 @@ void ParticleFilter::updateWeights(double std_landmark[],
             double w = exp( -( pow(l_x-obs_x,2)/(2*pow(std_landmark[0],2)) + pow(l_y-obs_y,2)/(2*pow(std_landmark[1],2)) ) ) / ( 2*M_PI*std_landmark[0]*std_landmark[1] );
             particles[i].weight *= w;
         }
-        std::cout<<particles[i].weight<<endl;
     }    
 }
 
