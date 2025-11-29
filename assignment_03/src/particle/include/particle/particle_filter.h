@@ -100,6 +100,8 @@ public:
 	 *   the new set of particles.
 	 */
 	void resample(double std[]);
+	void resamplingWheel(double std[]);
+	void adaptiveResampling(double resampling_std[], double max_w, Particle& new_particle);
 
 	/*
 	 * Set a particles list of associations, along with the associations calculated world x,y coordinates

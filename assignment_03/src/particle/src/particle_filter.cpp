@@ -13,7 +13,7 @@ using namespace std;
 static  default_random_engine gen;
 
 #define RESAMPLING_WHEEL
-#define ADAPTIVE_RESAMPLING
+// #define ADAPTIVE_RESAMPLING
 
 /*
 * This function initialize randomly the particles
@@ -202,30 +202,41 @@ void ParticleFilter::updateWeights(double std_landmark[],
     }    
 }
 
-/*
-* This function resamples the set of particles by repopulating the particles using the weight as metric
-*/
-void ParticleFilter::resample(double std[]) {
+void ParticleFilter::adaptiveResampling(double resampling_std[], double max_w, Particle& new_particle){
+    normal_distribution<double> dist_x(0.0, resampling_std[0]);
+    normal_distribution<double> dist_y(0.0, resampling_std[1]);
+    normal_distribution<double> dist_theta(0.0, resampling_std[2]);
     
-    uniform_int_distribution<int> dist_distribution(0,num_particles-1);
-    double beta  = 0.0;
-    vector<double> weights;
-    int index = dist_distribution(gen);
-    vector<Particle> new_particles;
+    double inc = 10 * (0.0001-max_w)/0.0001;
+    new_particle.x = new_particle.x + dist_x(gen) * inc;
+    new_particle.y = new_particle.y + dist_y(gen) * inc;
+    new_particle.theta = new_particle.theta + dist_theta(gen) * inc;
+}
 
+void ParticleFilter::resamplingWheel(double resampling_std[]){
+    //build the weights vector
+    vector<double> weights;
     for(int i=0;i<num_particles;i++)
         weights.push_back(particles[i].weight);
-																
-    double max_w = *max_element(weights.begin(), weights.end());
 
+    //get max weight
+    double max_w = *max_element(weights.begin(), weights.end());
     std::cout<<"max "<<max_w<<endl;
+    
+    //get a random starting index to initalize the wheel
+    uniform_int_distribution<int> dist_distribution(0,num_particles-1);
+    int index = dist_distribution(gen);
+
+    //other useful variables' initialization
+    double beta  = 0.0;
+    vector<Particle> new_particles;
     uniform_real_distribution<double> uni_dist(0.0, max_w);
 
-    normal_distribution<double> dist_x(0.0, std[0]);
-    normal_distribution<double> dist_y(0.0, std[1]);
-    normal_distribution<double> dist_theta(0.0, std[2]);
-
-    #ifdef RESAMPLING_WHEEL
+    /*
+        Resampling wheel algorithm: the wheel spins once for each particle through 
+        incrementing beta. The first slice of the wheel that has a weight greater than the
+        value of beta is taken. The selected particle survives for this round.
+    */
     for(int i = 0; i < num_particles; i++){
         beta = beta + uni_dist(gen) * 2;
         while(weights[index] < beta){
@@ -235,17 +246,21 @@ void ParticleFilter::resample(double std[]) {
         Particle new_particle = particles[index];
         #ifdef ADAPTIVE_RESAMPLING
         if(max_w < 0.0001){
-            double inc = 10 * (0.0001-max_w)/0.0001;
-            new_particle.x = new_particle.x + dist_x(gen) * inc;
-            new_particle.y = new_particle.y + dist_y(gen) * inc;
-            new_particle.theta = new_particle.theta + dist_theta(gen) * inc;
+            adaptive_resampling(resampling_std, max_w, new_particle);
         }
         #endif
         new_particles.push_back(new_particle);
     }
-    #endif
 
     particles.swap(new_particles);
+}
+
+void ParticleFilter::resample(double std[]) {
+    #ifdef RESAMPLING_WHEEL
+        resamplingWheel(std);
+    #elif defined SYSTEMATIC_RESAMPLING
+    #elif defined STRATIFIED_RESAMPLING
+    #endif
 }
 
 
