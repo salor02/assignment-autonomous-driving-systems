@@ -14,8 +14,8 @@
 * TODO
 * Define the proper number of particles
 */
-#define NPARTICLES 1000
-#define INIT_RANDOM 1
+#define NPARTICLES 500
+#define INIT_RANDOM 0
 #define circleID "circle_id"
 #define reflectorID "reflector_id"
 
@@ -38,6 +38,7 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_particles(new pcl::PointCloud<pcl::Poi
 double sigma_init [3] = {0.1, 0.1, 0.1};  //[x,y,theta] initialization noise. 
 double sigma_pos [3]  = {0.2, 0.2, 0.1}; //[x,y,theta] movement noise. Try values between [0.5 and 0.01]
 double sigma_landmark [2] = {0.2, 0.2};     //[x,y] sensor measurement noise. Try values between [0.5 and 0.1]
+double sigma_resampling [3] = {0.2, 0.2, 0.1};
 std::vector<Color> colors = {Color(1,0,0), Color(1,1,0), Color(0,0,1), Color(1,0,1), Color(0,1,1)};
 control_s odom;
 
@@ -130,7 +131,7 @@ void PointCloudCb(const sensor_msgs::msg::PointCloud2::SharedPtr cloud_msg){
     pf.updateWeights(sigma_landmark, noisy_observations, mapLandmark);
 
     // Resample the particles
-    pf.resample();
+    pf.resample(sigma_resampling);
 
     // Calculate and output the average weighted error of the particle filter over all time steps so far.
     Particle best_particle;

@@ -13,13 +13,14 @@ using namespace std;
 static  default_random_engine gen;
 
 #define RESAMPLING_WHEEL
+#define ADAPTIVE_RESAMPLING
 
 /*
-* TODO
 * This function initialize randomly the particles
 * Input:
-*  std - noise that might be added to the position
-*  nParticles - number of particles
+*  nParticles Number of particles used by the algorithm
+*  min_pt Point <x,y> whose coords are the lowest among cloudReflector points
+*  max_pt Point <x,y> whose coords are the greatest among cloudReflector points	 
 */
 void ParticleFilter::init_random(int nParticles, std::pair<float, float> min_pt, std::pair<float, float> max_pt) {
     num_particles = nParticles;
@@ -204,7 +205,7 @@ void ParticleFilter::updateWeights(double std_landmark[],
 /*
 * This function resamples the set of particles by repopulating the particles using the weight as metric
 */
-void ParticleFilter::resample() {
+void ParticleFilter::resample(double std[]) {
     
     uniform_int_distribution<int> dist_distribution(0,num_particles-1);
     double beta  = 0.0;
@@ -215,8 +216,14 @@ void ParticleFilter::resample() {
     for(int i=0;i<num_particles;i++)
         weights.push_back(particles[i].weight);
 																
-    float max_w = *max_element(weights.begin(), weights.end());
+    double max_w = *max_element(weights.begin(), weights.end());
+
+    std::cout<<"max "<<max_w<<endl;
     uniform_real_distribution<double> uni_dist(0.0, max_w);
+
+    normal_distribution<double> dist_x(0.0, std[0]);
+    normal_distribution<double> dist_y(0.0, std[1]);
+    normal_distribution<double> dist_theta(0.0, std[2]);
 
     #ifdef RESAMPLING_WHEEL
     for(int i = 0; i < num_particles; i++){
@@ -225,7 +232,16 @@ void ParticleFilter::resample() {
             beta -= weights[index];
             index = (index + 1) % num_particles;
         }
-        new_particles.push_back(particles[index]);
+        Particle new_particle = particles[index];
+        #ifdef ADAPTIVE_RESAMPLING
+        if(max_w < 0.0001){
+            double inc = 10 * (0.0001-max_w)/0.0001;
+            new_particle.x = new_particle.x + dist_x(gen) * inc;
+            new_particle.y = new_particle.y + dist_y(gen) * inc;
+            new_particle.theta = new_particle.theta + dist_theta(gen) * inc;
+        }
+        #endif
+        new_particles.push_back(new_particle);
     }
     #endif
 
