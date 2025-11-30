@@ -12,7 +12,8 @@ using namespace std;
 
 static  default_random_engine gen;
 
-#define RESAMPLING_WHEEL
+// #define RESAMPLING_WHEEL
+#define SYSTEMATIC_RESAMPLING
 // #define ADAPTIVE_RESAMPLING
 
 /*
@@ -213,6 +214,55 @@ void ParticleFilter::adaptiveResampling(double resampling_std[], double max_w, P
     new_particle.theta = new_particle.theta + dist_theta(gen) * inc;
 }
 
+void ParticleFilter::systematicResampling(double resampling_std[]){
+    //calculate the total weight for the normalization purpose
+    double weigth_sum = 0;
+    for(int i = 0; i < num_particles; i++){
+        weigth_sum += particles[i].weight;
+    }
+
+    //build the CDF (Cumulative Distribution Function), the normalization is applied through the process
+    vector<double> cumulative_weights = {particles[0].weight / weigth_sum};
+    for(int i = 1; i < num_particles; i++){
+        cumulative_weights.push_back(particles[i].weight / weigth_sum + cumulative_weights.back());
+    }
+
+    //in this algorithm the wheel is splitted in num_particles different sections, each one has the same length
+    double section = 1.0 / num_particles;
+
+    //pick a random value u belonging to the first section of the wheel
+    uniform_real_distribution<double> uni_dist(0.0, section);
+    double u = uni_dist(gen);
+
+    //this index keeps track of the current "step" of the CDF
+    int index = 0;
+
+    vector<Particle> new_particles;
+
+    /*
+        Systematic resampling: the wheel is divided in num_particles different sections and a random initial value u
+        is picked at the start. This value represents the mark indicating the particle to keep. At each iteration
+        the value u is incremented by the length of one section, resulting in a evenly marked wheel.
+    */
+    for(int i = 0; i < num_particles; i++){
+        while(u > cumulative_weights[index]){
+            index++;
+        }
+        
+        Particle new_particle = particles[index];
+        #ifdef ADAPTIVE_RESAMPLING
+        if(max_w < 0.0001){
+            adaptive_resampling(resampling_std, max_w, new_particle);
+        }
+        #endif
+        new_particles.push_back(new_particle);
+
+        u += section;
+    }
+
+    particles.swap(new_particles);
+}
+
 void ParticleFilter::resamplingWheel(double resampling_std[]){
     //build the weights vector
     vector<double> weights;
@@ -255,10 +305,11 @@ void ParticleFilter::resamplingWheel(double resampling_std[]){
     particles.swap(new_particles);
 }
 
-void ParticleFilter::resample(double std[]) {
+void ParticleFilter::resample(double resampling_std[]) {
     #ifdef RESAMPLING_WHEEL
-        resamplingWheel(std);
+        resamplingWheel(resampling_std);
     #elif defined SYSTEMATIC_RESAMPLING
+        systematicResampling(resampling_std);
     #elif defined STRATIFIED_RESAMPLING
     #endif
 }

@@ -99,8 +99,18 @@ public:
 	 * resample Resamples from the updated set of particles to form
 	 *   the new set of particles.
 	 */
-	void resample(double std[]);
-	void resamplingWheel(double std[]);
+	void resample(double resampling_std[]);
+
+	/**
+	 * The following functions are different types of resampling
+	 */
+	void resamplingWheel(double resampling_std[]);
+	void systematicResampling(double resampling_std[]);
+
+	/**
+	 * This function tries to diversificate the solutions and avoid premature convergence in case of 
+	 * high uncertainty scenario
+	 */
 	void adaptiveResampling(double resampling_std[], double max_w, Particle& new_particle);
 
 	/*
