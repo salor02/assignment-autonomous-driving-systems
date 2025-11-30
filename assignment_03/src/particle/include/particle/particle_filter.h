@@ -104,9 +104,9 @@ public:
 	/**
 	 * The following functions are different types of resampling
 	 */
-	void resamplingWheel(double resampling_std[]);
-	void systematicResampling(double resampling_std[]);
-	void stratifiedResampling(double resampling_std[]);
+	void resamplingWheel(double resampling_std[], double max_w);
+	void systematicResampling(double resampling_std[], double max_w);
+	void stratifiedResampling(double resampling_std[], double max_w);
 
 	/**
 	 * This function tries to diversificate the solutions and avoid premature convergence in case of 

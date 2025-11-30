@@ -12,9 +12,9 @@ using namespace std;
 
 static  default_random_engine gen;
 
-// #define RESAMPLING_WHEEL
+#define RESAMPLING_WHEEL
 // #define SYSTEMATIC_RESAMPLING
-#define STRATIFIED_RESAMPLING
+// #define STRATIFIED_RESAMPLING
 // #define ADAPTIVE_RESAMPLING
 
 /*
@@ -215,17 +215,12 @@ void ParticleFilter::adaptiveResampling(double resampling_std[], double max_w, P
     new_particle.theta = new_particle.theta + dist_theta(gen) * inc;
 }
 
-void ParticleFilter::stratifiedResampling(double resampling_std[]){
-        //calculate the total weight for the normalization purpose
-    double weigth_sum = 0;
-    for(int i = 0; i < num_particles; i++){
-        weigth_sum += particles[i].weight;
-    }
+void ParticleFilter::stratifiedResampling(double resampling_std[], double max_w){
 
     //build the CDF (Cumulative Distribution Function), the normalization is applied through the process
-    vector<double> cumulative_weights = {particles[0].weight / weigth_sum};
+    vector<double> cumulative_weights = {weights[0]};
     for(int i = 1; i < num_particles; i++){
-        cumulative_weights.push_back(particles[i].weight / weigth_sum + cumulative_weights.back());
+        cumulative_weights.push_back(weights[i] + cumulative_weights.back());
     }
 
     //in this algorithm the wheel is splitted in num_particles different sections, each one has the same length
@@ -263,17 +258,12 @@ void ParticleFilter::stratifiedResampling(double resampling_std[]){
     particles.swap(new_particles);
 }
 
-void ParticleFilter::systematicResampling(double resampling_std[]){
-    //calculate the total weight for the normalization purpose
-    double weigth_sum = 0;
-    for(int i = 0; i < num_particles; i++){
-        weigth_sum += particles[i].weight;
-    }
+void ParticleFilter::systematicResampling(double resampling_std[], double max_w){
 
     //build the CDF (Cumulative Distribution Function), the normalization is applied through the process
-    vector<double> cumulative_weights = {particles[0].weight / weigth_sum};
+    vector<double> cumulative_weights = {weights[0]};
     for(int i = 1; i < num_particles; i++){
-        cumulative_weights.push_back(particles[i].weight / weigth_sum + cumulative_weights.back());
+        cumulative_weights.push_back(weights[i] + cumulative_weights.back());
     }
 
     //in this algorithm the wheel is splitted in num_particles different sections, each one has the same length
@@ -312,16 +302,7 @@ void ParticleFilter::systematicResampling(double resampling_std[]){
     particles.swap(new_particles);
 }
 
-void ParticleFilter::resamplingWheel(double resampling_std[]){
-    //build the weights vector
-    vector<double> weights;
-    for(int i=0;i<num_particles;i++)
-        weights.push_back(particles[i].weight);
-
-    //get max weight
-    double max_w = *max_element(weights.begin(), weights.end());
-    std::cout<<"max "<<max_w<<endl;
-    
+void ParticleFilter::resamplingWheel(double resampling_std[], double max_w){
     //get a random starting index to initalize the wheel
     uniform_int_distribution<int> dist_distribution(0,num_particles-1);
     int index = dist_distribution(gen);
@@ -355,12 +336,28 @@ void ParticleFilter::resamplingWheel(double resampling_std[]){
 }
 
 void ParticleFilter::resample(double resampling_std[]) {
+
+    //calculate the total weight for the normalization purpose
+    double weigth_sum = 0;
+    for(int i = 0; i < num_particles; i++){
+        weigth_sum += particles[i].weight;
+    }
+
+    //build the weights vector
+    weights.clear();
+    for(int i=0;i<num_particles;i++)
+        weights.push_back(particles[i].weight / weigth_sum);
+
+    //get max weight
+    double max_w = *max_element(weights.begin(), weights.end());
+    // std::cout<<"max "<<max_w<<endl;
+
     #ifdef RESAMPLING_WHEEL
-        resamplingWheel(resampling_std);
+        resamplingWheel(resampling_std, max_w);
     #elif defined SYSTEMATIC_RESAMPLING
-        systematicResampling(resampling_std);
+        systematicResampling(resampling_std, max_w);
     #elif defined STRATIFIED_RESAMPLING
-        stratifiedResampling(resampling_std);
+        stratifiedResampling(resampling_std, max_w);
     #endif
 }
 
