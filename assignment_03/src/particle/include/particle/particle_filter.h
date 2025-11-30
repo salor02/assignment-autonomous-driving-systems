@@ -106,6 +106,7 @@ public:
 	 */
 	void resamplingWheel(double resampling_std[]);
 	void systematicResampling(double resampling_std[]);
+	void stratifiedResampling(double resampling_std[]);
 
 	/**
 	 * This function tries to diversificate the solutions and avoid premature convergence in case of 
