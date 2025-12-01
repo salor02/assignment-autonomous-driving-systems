@@ -1,4 +1,8 @@
 .vscode
 */**/*.pcd
-*/build
+**/build
+**/install
+**/log
 log/*
+techboard_log.db3
+res.txt
