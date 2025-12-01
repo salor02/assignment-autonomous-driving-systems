@@ -101,7 +101,7 @@ In this scenario, an attempt is made to increase the precision in curve detectio
 | | X | Y | theta |
 | :--- | :---: | :---: | :---: |
 | Initialization Noise | 0.1 | 0.1 | 0.1 |
-| Motion Noise | 0.2 | 0.2 | 0.05 |
+| Motion Noise | 0.2 | 0.2 | ***0.05*** |
 | Sensor Noise | 0.2 | 0.2 | |
 
 | Parameter | Value |
@@ -111,7 +111,9 @@ In this scenario, an attempt is made to increase the precision in curve detectio
 | Initialization Type | From GPS |
 
 #### Results
-The results obtained demonstrate what was previously predicted. Indeed, the reduction of noise on the turning angle allows for more precise localization of all the curves made by the robot. The difference compared to the reference scenario is visible especially in the circled sections, where the dispersion of the particles is much lower. However, the trajectory identified in the straight sections along both axes is still quite inaccurate and "wide".
+The results obtained demonstrate what was previously predicted. Indeed, the reduction of noise on the turning angle allows for more precise localization of all the curves made by the robot. The difference compared to the reference scenario is visible especially in the green circled sections, where the dispersion of the particles is much lower. However, the trajectory identified in the straight sections along both axes is still quite inaccurate and "wide". Furthermore, the dispersion in the inital steps is accentuate as can be seen in the red circled region. This is due to the fact that having less exploraiton range for theta, the particle filter struggle to find a right appoximation initially.
+
+![Scenario 01 result](./img/scenario-01.png)
 
 ---
 
@@ -122,7 +124,7 @@ The objective of this scenario is to reduce the width of the oblique straight se
 | | X | Y | theta |
 | :--- | :---: | :---: | :---: |
 | Initialization Noise | 0.1 | 0.1 | 0.1 |
-| Motion Noise | 0.05 | 0.05 | 0.05 |
+| Motion Noise | ***0.05*** | ***0.05*** | 0.05 |
 | Sensor Noise | 0.2 | 0.2 | |
 
 | Parameter | Value |
@@ -132,7 +134,9 @@ The objective of this scenario is to reduce the width of the oblique straight se
 | Initialization Type | From GPS |
 
 #### Results
-As visible in the graph, the trajectory identified by the particle filter is overall very precise and very similar to the ground truth. As predicted, the width of the oblique straight sections has been reduced. However, by further reducing the parameters related to motion noise on the two axes, the precision decreases drastically, leading to the identification of completely incorrect trajectories.
+As visible in the graph, the trajectory identified by the particle filter is overall very precise and very similar to the ground truth. As predicted, the width of the oblique straight sections has been reduced. However, by further reducing the parameters related to motion noise on the two axes, the precision decreases drastically, leading to the identification of completely incorrect trajectories. As seen in previous scenario, an initial dispersion can be seen in the circled region, caused by the low motion noise itself.
+
+![Scenario 02 result](./img/scenario-02.png)
 
 ---
 
@@ -148,12 +152,14 @@ This scenario aims to study the tradeoff between the number of particles and the
 
 | Parameter | Value |
 | :--- | :---: | 
-| Number of Particles | 100 |
+| Number of Particles | ***100*** |
 | Resampling Algorithm | Wheel |
 | Initialization Type | From GPS |
 
 #### Results
-From the graph, it is possible to observe that due to the reduction in the number of particles, the inaccuracy in the trajectory increases significantly, which, in this scenario, is quite "wide", indicating a greater dispersion of the particles. This translates into the fact that, with the same noise, the particle density decreases, causing more pronounced jumps between the positions of the best particles at each iteration. The advantage introduced in this scenario, however, is represented by the execution time, which is halved compared to the case of the reference scenario.
+From the graph, it is possible to observe that due to the reduction in the number of particles, the inaccuracy in the trajectory increases significantly, which, in this scenario, is quite "wide", indicating a greater dispersion of the particles. This translates into the fact that, with the same noise, the particle density decreases, causing more pronounced jumps between the positions of the best particles at each iteration. The advantage introduced in this scenario, however, is represented by the execution time, which is halved compared to the case of the reference scenario. As seen in previous scenario, an initial dispersion can be seen in the circled region, caused by the low motion noise itself.
+
+![Scenario 03 result](./img/scenario-03.png)
 
 ---
 
@@ -171,12 +177,14 @@ This scenario aims to highlight any differences present in the trajectory identi
 | :--- | :---: | 
 | Number of Particles | 500 |
 | Resampling Algorithm | Wheel |
-| Initialization Type | Random |
+| Initialization Type | ***Random*** |
 
 #### Results
-The graph highlights a peculiarity compared to all other scenarios: there is a line of points very distant from each other. These points describe the positions of the best particle during the first iterations of the particle filter. This behavior is due to the fact that, initially, the particles are very sparse and it is necessary to wait for the algorithm to attribute a greater weight to the most representative particles in order to stabilize the position; only once the best particles (i.e., those generated near the robot) are correctly weighted the particle filter proceed normally. It is therefore stated that the random initialization of the particles causes less stability in the initial phase of the particle filter.
+The graph highlights a peculiarity compared to all other scenarios: there is a line of points very distant from each other. These points describe the positions of the best particle during the first iterations of the particle filter. This behavior is due to the fact that, initially, the particles are very sparse and it is necessary to wait for the algorithm to attribute a greater weight to the most representative particles in order to stabilize the position; only once the best particles (i.e., those generated near the robot) are correctly weighted the particle filter proceed normally. Actually, this result shows a better tracking wrt GPS initialization, probably caused by a wider exploration of the solution space in the initial steps: this avoids the problem of the large dispersion seen in the previous scenarios.
 
 It is also emphasized that the number of particles was set to 500 following some tests: using 100 particles, the algorithm converges with difficulty since the probability that a particle is generated near the robot is reduced; conversely, using 1000 particles, the system behavior becomes very similar to the scenario with GPS initialization as it is probable that a good number of particles are generated near the robot.
+
+![Scenario 04 result](./img/scenario-04.png)
 
 ---
 
@@ -200,11 +208,21 @@ This is a method very similar to systematic resampling. The only difference from
 
 | Parameter | Value |
 | :--- | :---: | 
-| Number of Particles | 5000 |
-| Resampling Algorithm | Systematic and Stratified |
+| Number of Particles | 10000 |
+| Resampling Algorithm | ***Systematic and Stratified*** |
 | Initialization Type | From GPS |
 
 #### Results
-The graphs show a slight difference in execution time. It can be observed, in particular, that wheel resampling presents many more peaks that are much higher than the other two resampling methods which, on the contrary, are more stable. It is emphasized that the trajectory identified by the three resampling methods is identical and for this reason it was omitted in this scenario.
+The graphs show a slight difference in execution time. It can be observed, in particular, that wheel resampling presents many more peaks that are much higher than the other two resampling methods which, on the contrary, are more stable. More specifically, the number of iterations done in the resampling step by the wheel method is not known: it depends on the (random) value of beta. Conversely, the other two methods execute always the same number of iterations, approximately. The trajectory identified by the three resampling methods is identical and for this reason it was omitted in this scenario.
+
+##### Wheel resampling
+![Scenario 05 result wheel](./img/scenario-05-wheel.png)
+
+##### Systematic resampling
+![Scenario 05 result systematic](./img/scenario-05-systematic.png)
+
+##### Stratified resampling
+![Scenario 05 result stratified](./img/scenario-05-stratified.png)
+
 
 
