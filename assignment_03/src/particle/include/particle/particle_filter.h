@@ -2,6 +2,7 @@
 #define PARTICLE_FILTER_H_
 
 #include "particle/helper_functions.h"
+#include <random>
 
 struct Particle {
 
@@ -104,15 +105,15 @@ public:
 	/**
 	 * The following functions are different types of resampling
 	 */
-	void resamplingWheel(double resampling_std[], double max_w);
-	void systematicResampling(double resampling_std[], double max_w);
-	void stratifiedResampling(double resampling_std[], double max_w);
+	void resamplingWheel(std::normal_distribution<double> dist_x, std::normal_distribution<double> dist_y, std::normal_distribution<double> dist_theta);
+	void systematicResampling(std::normal_distribution<double> dist_x, std::normal_distribution<double> dist_y, std::normal_distribution<double> dist_theta);
+	void stratifiedResampling(std::normal_distribution<double> dist_x, std::normal_distribution<double> dist_y, std::normal_distribution<double> dist_theta);
 
 	/**
 	 * This function tries to diversificate the solutions and avoid premature convergence in case of 
 	 * high uncertainty scenario
 	 */
-	void adaptiveResampling(double resampling_std[], double max_w, Particle& new_particle);
+	void adaptiveResampling(std::normal_distribution<double> dist_x, std::normal_distribution<double> dist_y, std::normal_distribution<double> dist_theta, Particle& new_particle);
 
 	/*
 	 * Set a particles list of associations, along with the associations calculated world x,y coordinates

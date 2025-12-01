@@ -266,4 +266,17 @@ The achieved result can be considered the best one. It is based on a tradeoff be
 
 ![Optimal scenario](./img/optimal-scenario.png)
 
+## Optional functionality: Adaptive Resampling implementation
+The objective of an adapative resampling is to adapt the resampling step based on the actual status of the particle filter. In the proposed implementation the adapative particle filter widen or narrow the area in which new particles are spreaded during the resampling step. More specifically, when the filter is stable the resampling variance is low, when the filter is degenerating (huge weight on few particles) the resampling variance is high. By this action, we want to promote the diversification of particles in case the filter is degenerating.
+
+This implementation is based on the following paper: [A tutorial on particle filters for online nonlinear/non-Gaussian Bayesian tracking](https://ieeexplore.ieee.org/document/978374)
+
+It considers the ESS (Effective Sample Size) as a measure for the current performance of the filter. Ideally, ESS should have values close to N: this indicates that every particles have approximately the same weight and there is no danger of degeneration and/or impoverishment. Conversely, values close to 1 indicate that a tiny amount of particles have the majority of the weight. This last situation needs immediate attention in order to prevent the filter degeneration.
+
+### Parameters
+
+### Results
+
+![Adapative resampling](./img/adaptive-resampling.png)
+
 

@@ -17,6 +17,10 @@ static  default_random_engine gen;
 // #define STRATIFIED_RESAMPLING
 // #define ADAPTIVE_RESAMPLING
 
+// Thresholds for adapative resampling (discovered by trial and error, working with sensor noise of 0.5)
+const double U_MIN = 0.95;
+const double U_MAX = 1;
+
 /*
 * This function initialize randomly the particles
 * Input:
@@ -204,18 +208,13 @@ void ParticleFilter::updateWeights(double std_landmark[],
     }    
 }
 
-void ParticleFilter::adaptiveResampling(double resampling_std[], double max_w, Particle& new_particle){
-    normal_distribution<double> dist_x(0.0, resampling_std[0]);
-    normal_distribution<double> dist_y(0.0, resampling_std[1]);
-    normal_distribution<double> dist_theta(0.0, resampling_std[2]);
-    
-    double inc = 10 * (0.0001-max_w)/0.0001;
-    new_particle.x = new_particle.x + dist_x(gen) * inc;
-    new_particle.y = new_particle.y + dist_y(gen) * inc;
-    new_particle.theta = new_particle.theta + dist_theta(gen) * inc;
+void ParticleFilter::adaptiveResampling(normal_distribution<double> dist_x, normal_distribution<double> dist_y, normal_distribution<double> dist_theta, Particle& new_particle){
+    new_particle.x = new_particle.x + dist_x(gen);
+    new_particle.y = new_particle.y + dist_y(gen);
+    new_particle.theta = new_particle.theta + dist_theta(gen);
 }
 
-void ParticleFilter::stratifiedResampling(double resampling_std[], double max_w){
+void ParticleFilter::stratifiedResampling(normal_distribution<double> dist_x, normal_distribution<double> dist_y, normal_distribution<double> dist_theta){
 
     //build the CDF (Cumulative Distribution Function), the normalization is applied through the process
     vector<double> cumulative_weights = {weights[0]};
@@ -248,9 +247,7 @@ void ParticleFilter::stratifiedResampling(double resampling_std[], double max_w)
         
         Particle new_particle = particles[index];
         #ifdef ADAPTIVE_RESAMPLING
-        if(max_w < 0.0001){
-            adaptive_resampling(resampling_std, max_w, new_particle);
-        }
+        adaptiveResampling(dist_x, dist_y, dist_theta, new_particle);
         #endif
         new_particles.push_back(new_particle);
     }
@@ -258,7 +255,7 @@ void ParticleFilter::stratifiedResampling(double resampling_std[], double max_w)
     particles.swap(new_particles);
 }
 
-void ParticleFilter::systematicResampling(double resampling_std[], double max_w){
+void ParticleFilter::systematicResampling(normal_distribution<double> dist_x, normal_distribution<double> dist_y, normal_distribution<double> dist_theta){
 
     //build the CDF (Cumulative Distribution Function), the normalization is applied through the process
     vector<double> cumulative_weights = {weights[0]};
@@ -290,9 +287,7 @@ void ParticleFilter::systematicResampling(double resampling_std[], double max_w)
         
         Particle new_particle = particles[index];
         #ifdef ADAPTIVE_RESAMPLING
-        if(max_w < 0.0001){
-            adaptive_resampling(resampling_std, max_w, new_particle);
-        }
+        adaptiveResampling(dist_x, dist_y, dist_theta, new_particle);
         #endif
         new_particles.push_back(new_particle);
 
@@ -302,10 +297,14 @@ void ParticleFilter::systematicResampling(double resampling_std[], double max_w)
     particles.swap(new_particles);
 }
 
-void ParticleFilter::resamplingWheel(double resampling_std[], double max_w){
+void ParticleFilter::resamplingWheel(normal_distribution<double> dist_x, normal_distribution<double> dist_y, normal_distribution<double> dist_theta){
     //get a random starting index to initalize the wheel
     uniform_int_distribution<int> dist_distribution(0,num_particles-1);
     int index = dist_distribution(gen);
+
+    //get max weight
+    double max_w = *max_element(weights.begin(), weights.end());
+    // std::cout<<"max "<<max_w<<endl;
 
     //other useful variables' initialization
     double beta  = 0.0;
@@ -325,9 +324,7 @@ void ParticleFilter::resamplingWheel(double resampling_std[], double max_w){
         }
         Particle new_particle = particles[index];
         #ifdef ADAPTIVE_RESAMPLING
-        if(max_w < 0.0001){
-            adaptive_resampling(resampling_std, max_w, new_particle);
-        }
+        adaptiveResampling(dist_x, dist_y, dist_theta, new_particle);
         #endif
         new_particles.push_back(new_particle);
     }
@@ -348,16 +345,44 @@ void ParticleFilter::resample(double resampling_std[]) {
     for(int i=0;i<num_particles;i++)
         weights.push_back(particles[i].weight / weigth_sum);
 
-    //get max weight
-    double max_w = *max_element(weights.begin(), weights.end());
-    // std::cout<<"max "<<max_w<<endl;
+    #ifdef ADAPTIVE_RESAMPLING
+
+    double square_weight_sum = 0;
+    for(int i = 0; i < weights.size(); i++){
+        square_weight_sum += pow(weights[i], 2);
+    }
+    //the closer to num_particles the better the filter is performing (effective sample size)
+    double ess = 1.0 / square_weight_sum;
+
+    //the closer 0 the better the filter is performing, values close to 1 indicate a filter degeneration
+    double u = 1.0 - ess / num_particles;
+
+    /*
+        The adaptive resmapling takes effect for values of u between U_MIN and U_MAX.
+        Based on this range, alpha can get value from 0 to 1. Alpha is just a multiplicator
+        of the std_resample: higher values of u require an high correction and therefore a larger variance of the sampled
+        particles. 
+    */
+    double alpha = clamp((u - U_MIN) / (U_MAX - U_MIN), 0.0, 1.0);
+    
+    cout<<alpha<<endl;
+    
+    normal_distribution<double> dist_x(0.0, resampling_std[0] * alpha);
+    normal_distribution<double> dist_y(0.0, resampling_std[1] * alpha);
+    normal_distribution<double> dist_theta(0.0, resampling_std[2] * alpha);
+    #else
+    //dummy values if adaptive resampling is not active
+    normal_distribution<double> dist_x(0.0, resampling_std[0]);
+    normal_distribution<double> dist_y(0.0, resampling_std[1]);
+    normal_distribution<double> dist_theta(0.0, resampling_std[2]);
+    #endif
 
     #ifdef RESAMPLING_WHEEL
-        resamplingWheel(resampling_std, max_w);
+        resamplingWheel(dist_x, dist_y, dist_theta);
     #elif defined SYSTEMATIC_RESAMPLING
-        systematicResampling(resampling_std, max_w);
+        systematicResampling(dist_x, dist_y, dist_theta);
     #elif defined STRATIFIED_RESAMPLING
-        stratifiedResampling(resampling_std, max_w);
+        stratifiedResampling(dist_x, dist_y, dist_theta);
     #endif
 }
 
