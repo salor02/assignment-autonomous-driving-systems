@@ -12,8 +12,8 @@ using namespace std;
 
 static  default_random_engine gen;
 
-// #define RESAMPLING_WHEEL
-#define SYSTEMATIC_RESAMPLING
+#define RESAMPLING_WHEEL
+// #define SYSTEMATIC_RESAMPLING
 // #define STRATIFIED_RESAMPLING
 // #define ADAPTIVE_RESAMPLING
 

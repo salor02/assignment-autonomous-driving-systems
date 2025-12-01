@@ -224,5 +224,46 @@ The graphs show a slight difference in execution time. It can be observed, in pa
 ##### Stratified resampling
 ![Scenario 05 result stratified](./img/scenario-05-stratified.png)
 
+### Scenario 06 - Increased noise on both axes and theta
+By this scenario, we want to show the impact of a pretty big motion noise on both axes and theta.
+
+#### Parameters
+| | X | Y | theta |
+| :--- | :---: | :---: | :---: |
+| Initialization Noise | 0.1 | 0.1 | 0.1 |
+| Motion Noise | ***0.5*** | ***0.5*** | ***0.5*** |
+| Sensor Noise | 0.2 | 0.2 | |
+
+| Parameter | Value |
+| :--- | :---: | 
+| Number of Particles | 1000 |
+| Resampling Algorithm | Wheel |
+| Initialization Type | From GPS |
+
+#### Results
+The result obtained shows a trajectory way more approximative compared to the previous scenarios: this is due to the fact that at each prediction step, the particles are spreaded in a larger area. However, the filter converges almost instantly without an initial "dispersive" phase, as noted in scenarios with less noise.
+
+![Scenario 06 result](./img/scenario-06.png)
+
+### Optimal scenario
+This scenario aims to show the best solution found based on the previous described experiments. The motion noise on both axes can be set to a small value since we do not expect a sudden big movement of the vehicle. We must stay aware of sudden angle variations though: this is the reason for a bigger noise on theta.
+
+#### Parameters
+| | X | Y | theta |
+| :--- | :---: | :---: | :---: |
+| Initialization Noise | 0.1 | 0.1 | 0.1 |
+| Motion Noise | ***0.05*** | ***0.05*** | ***0.2*** |
+| Sensor Noise | 0.2 | 0.2 | |
+
+| Parameter | Value |
+| :--- | :---: | 
+| Number of Particles | 1000 |
+| Resampling Algorithm | Wheel |
+| Initialization Type | From GPS |
+
+#### Results
+The achieved result can be considered the best one. It is based on a tradeoff between approximation, solution space exploration and execution time. The trajectory does not suffer from an initial dispersion and it tracks really good sudden angle variations.
+
+![Optimal scenario](./img/optimal-scenario.png)
 
 
