@@ -92,6 +92,8 @@ This scenario is used as an initial reference for all subsequent scenarios. The 
 #### Results
 The results obtained demonstrate that the robot is localized very approximately. The trajectory identified in the two straight sections along the x-axis is, actually, quite accurate. The situation is different for the trajectories identified in the straight sections along both axes and in the curves, where the precision of the particle filter decreases drastically.
 
+![Reference scenario](./img/ref-scenario.png)
+
 ---
 
 ### Scenario 01 - Reduction of noise on theta
