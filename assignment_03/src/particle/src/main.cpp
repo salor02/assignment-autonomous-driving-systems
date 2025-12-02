@@ -10,11 +10,12 @@
 #include <particle/helper_cloud.h>
 #include "sensor_msgs/msg/point_cloud2.hpp"
 #include <pcl_conversions/pcl_conversions.h>
+
 /*
-* TODO
 * Define the proper number of particles
 */
-#define NPARTICLES 0
+#define NPARTICLES 1000
+#define INIT_RANDOM 0
 #define circleID "circle_id"
 #define reflectorID "reflector_id"
 
@@ -22,7 +23,8 @@ using namespace std;
 using namespace lidar_obstacle_detection;
 
 
-Map map_mille;  
+Map map_mille;
+std::vector<LandmarkObs> mapLandmark;
 ParticleFilter pf;
 bool init_odom=false;
 Renderer renderer;
@@ -31,12 +33,12 @@ std::ofstream myfile;
 pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_particles(new pcl::PointCloud<pcl::PointXYZ>);
 
 /*
-* TODO
 * Define the proper noise values
 */
-double sigma_init [3] = {0, 0, 0};  //[x,y,theta] initialization noise. 
-double sigma_pos [3]  = {0.05, 0.05, 0.05}; //[x,y,theta] movement noise. Try values between [0.5 and 0.01]
-double sigma_landmark [2] = {0.4, 0.4};     //[x,y] sensor measurement noise. Try values between [0.5 and 0.1]
+double sigma_init [3] = {0.1, 0.1, 0.1};  //[x,y,theta] initialization noise. 
+double sigma_pos [3]  = {0.05, 0.05, 0.2}; //[x,y,theta] movement noise. Try values between [0.5 and 0.01]
+double sigma_landmark [2] = {0.2, 0.2};     //[x,y] sensor measurement noise. Try values between [0.5 and 0.1] Set it to 0.5 for adapative resampling
+double sigma_resampling [3] = {0.05, 0.05, 0.2}; //[x, y, theta] resampling noise. This takes effect only if adaptive resampling is active
 std::vector<Color> colors = {Color(1,0,0), Color(1,1,0), Color(0,0,1), Color(1,0,1), Color(0,1,1)};
 control_s odom;
 
@@ -126,10 +128,10 @@ void PointCloudCb(const sensor_msgs::msg::PointCloud2::SharedPtr cloud_msg){
     }
 
     // Update the weights of the particle 
-    pf.updateWeights(sigma_landmark, noisy_observations, map_mille);
+    pf.updateWeights(sigma_landmark, noisy_observations, mapLandmark);
 
     // Resample the particles
-    pf.resample();
+    pf.resample(sigma_resampling);
 
     // Calculate and output the average weighted error of the particle filter over all time steps so far.
     Particle best_particle;
@@ -165,18 +167,23 @@ int main(int argc,char **argv)
 
     pcl::VoxelGrid<pcl::PointXYZ> vg;
     // Create file with the map info
-    pcl::io::loadPCDFile ("../data/map_reflector.pcd", *cloudReflectors); // cloud with just the reflectors
-    pcl::io::loadPCDFile ("../data/map_pepperl.pcd", *cloudMap); // total cloud (used for rendering)
+    pcl::io::loadPCDFile ("../../data/map_reflector.pcd", *cloudReflectors); // cloud with just the reflectors
+    pcl::io::loadPCDFile ("../../data/map_pepperl.pcd", *cloudMap); // total cloud (used for rendering)
 
     remove("./res.txt");
     // This function locates the reflectors within the map and writes into the file
-    createMap(cloudReflectors,"../data/map_data.txt",map_mille);
+    createMap(cloudReflectors,"../../data/map_data.txt",map_mille);
 
     // Read map data
-    if (!read_map_data("../data/map_data.txt", map_mille)) {
+    if (!read_map_data("../../data/map_data.txt", map_mille)) {
         cout << "Error: Could not open map file" << endl;
         return -1;
-    } 
+    }
+    
+    //Creates a vector that stores the map (this is the improved version: the previous code was inside updateWeights function)
+    for(int j=0;j<map_mille.landmark_list.size();j++){
+        mapLandmark.push_back(LandmarkObs{map_mille.landmark_list[j].id_i,map_mille.landmark_list[j].x_f,map_mille.landmark_list[j].y_f});
+    }
  
     // Reduce the number of points in the map point cloud (for improving the performance of the rendering)
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered_map (new pcl::PointCloud<pcl::PointXYZ>);
@@ -207,8 +214,13 @@ int main(int argc,char **argv)
     best_particles.push_back(p);
     
     // Init the particle filter
+    #if INIT_RANDOM == 0
     pf.init(GPS_x, GPS_y, GPS_theta, sigma_init, NPARTICLES);
-    //pf.init_random(sigma_init,NPARTICLES);
+    #else
+    pcl::PointXYZ min_pt, max_pt;
+    pcl::getMinMax3D(*cloudReflectors, min_pt, max_pt);
+    pf.init_random(NPARTICLES, std::pair<float, float>(min_pt.x, min_pt.y), std::pair<float, float>(max_pt.x, max_pt.y));
+    #endif
 
     // Render all the particles
     for(int i=0;i<NPARTICLES;i++){

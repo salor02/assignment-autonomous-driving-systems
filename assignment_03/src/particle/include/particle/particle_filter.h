@@ -2,6 +2,7 @@
 #define PARTICLE_FILTER_H_
 
 #include "particle/helper_functions.h"
+#include <random>
 
 struct Particle {
 
@@ -58,11 +59,11 @@ public:
 		/**
 	 * init Initializes particle filter by randomly distributing the particles 
 	 * around the map.
-	 * @param std[] Array of dimension 3 [standard deviation of x [m], standard deviation of y [m]
-	 *   standard deviation of yaw [rad]]
 	 * @param nParticles Number of particles used by the algorithm
+	 * @param min_pt Point <x,y> whose coords are the lowest among cloudReflector points
+	 * @param max_pt Point <x,y> whose coords are the greatest among cloudReflector points	 
 	 */
-	void init_random(double std[],int nParticles);
+	void init_random(int nParticles, std::pair<float, float> min_pt, std::pair<float, float> max_pt);
 
 
 	/**
@@ -93,13 +94,26 @@ public:
 	 * @param map Map class containing map landmarks
 	 */
 	void updateWeights(double std_landmark[], std::vector<LandmarkObs> observations,
-			Map map_landmarks);
+			std::vector<LandmarkObs> mapLandmark);
 	
 	/**
 	 * resample Resamples from the updated set of particles to form
 	 *   the new set of particles.
 	 */
-	void resample();
+	void resample(double resampling_std[]);
+
+	/**
+	 * The following functions are different types of resampling
+	 */
+	void resamplingWheel(std::normal_distribution<double> dist_x, std::normal_distribution<double> dist_y, std::normal_distribution<double> dist_theta);
+	void systematicResampling(std::normal_distribution<double> dist_x, std::normal_distribution<double> dist_y, std::normal_distribution<double> dist_theta);
+	void stratifiedResampling(std::normal_distribution<double> dist_x, std::normal_distribution<double> dist_y, std::normal_distribution<double> dist_theta);
+
+	/**
+	 * This function tries to diversificate the solutions and avoid premature convergence in case of 
+	 * high uncertainty scenario
+	 */
+	void adaptiveResampling(std::normal_distribution<double> dist_x, std::normal_distribution<double> dist_y, std::normal_distribution<double> dist_theta, Particle& new_particle);
 
 	/*
 	 * Set a particles list of associations, along with the associations calculated world x,y coordinates
