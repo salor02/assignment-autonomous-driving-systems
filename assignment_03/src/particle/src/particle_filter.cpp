@@ -22,7 +22,7 @@ const double U_MIN = 0.95;
 const double U_MAX = 1;
 
 /*
-* This function initialize randomly the particles
+* This function initializes randomly the particles
 * Input:
 *  nParticles Number of particles used by the algorithm
 *  min_pt Point <x,y> whose coords are the lowest among cloudReflector points
@@ -358,7 +358,7 @@ void ParticleFilter::resample(double resampling_std[]) {
     double u = 1.0 - ess / num_particles;
 
     /*
-        The adaptive resmapling takes effect for values of u between U_MIN and U_MAX.
+        The adaptive resampling takes effect for values of u between U_MIN and U_MAX.
         Based on this range, alpha can get value from 0 to 1. Alpha is just a multiplicator
         of the std_resample: higher values of u require an high correction and therefore a larger variance of the sampled
         particles. 

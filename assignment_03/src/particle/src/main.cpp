@@ -10,8 +10,8 @@
 #include <particle/helper_cloud.h>
 #include "sensor_msgs/msg/point_cloud2.hpp"
 #include <pcl_conversions/pcl_conversions.h>
+
 /*
-* TODO
 * Define the proper number of particles
 */
 #define NPARTICLES 1000
@@ -37,8 +37,8 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_particles(new pcl::PointCloud<pcl::Poi
 */
 double sigma_init [3] = {0.1, 0.1, 0.1};  //[x,y,theta] initialization noise. 
 double sigma_pos [3]  = {0.05, 0.05, 0.2}; //[x,y,theta] movement noise. Try values between [0.5 and 0.01]
-double sigma_landmark [2] = {0.2, 0.2};     //[x,y] sensor measurement noise. Try values between [0.5 and 0.1]
-double sigma_resampling [3] = {0.05, 0.05, 0.2};
+double sigma_landmark [2] = {0.2, 0.2};     //[x,y] sensor measurement noise. Try values between [0.5 and 0.1] Set it to 0.5 for adapative resampling
+double sigma_resampling [3] = {0.05, 0.05, 0.2}; //[x, y, theta] resampling noise. This takes effect only if adaptive resampling is active
 std::vector<Color> colors = {Color(1,0,0), Color(1,1,0), Color(0,0,1), Color(1,0,1), Color(0,1,1)};
 control_s odom;
 

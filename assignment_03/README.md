@@ -90,7 +90,7 @@ This scenario is used as an initial reference for all subsequent scenarios. The 
 | Initialization Type | From GPS |
 
 #### Results
-The results obtained demonstrate that the robot is localized very approximately. The trajectory identified in the two straight sections along the x-axis is, actually, quite accurate. The situation is different for the trajectories identified in the straight sections along both axes and in the curves, where the precision of the particle filter decreases drastically.
+The results obtained demonstrate that the robot is localized very approximately. The trajectory identified in the two straight sections along the x-axis is, actually, quite accurate. However the situation is different for the trajectories identified in the straight sections along both axes and in the curves, where the precision of the particle filter decreases drastically.
 
 ![Reference scenario](./img/ref-scenario.png)
 
@@ -159,7 +159,7 @@ This scenario aims to study the tradeoff between the number of particles and the
 | Initialization Type | From GPS |
 
 #### Results
-From the graph, it is possible to observe that due to the reduction in the number of particles, the inaccuracy in the trajectory increases significantly, which, in this scenario, is quite "wide", indicating a greater dispersion of the particles. This translates into the fact that, with the same noise, the particle density decreases, causing more pronounced jumps between the positions of the best particles at each iteration. The advantage introduced in this scenario, however, is represented by the execution time, which is halved compared to the case of the reference scenario. As seen in previous scenario, an initial dispersion can be seen in the circled region, caused by the low motion noise itself.
+From the graph, it is possible to observe that due to the reduction in the number of particles, the inaccuracy in the trajectory increases significantly, which, in this scenario, is quite "wide", indicating a greater dispersion of the particles. This translates into the fact that, with the same noise, the particle density decreases, causing more pronounced jumps between the positions of the best particles at each iteration. The advantage introduced in this scenario, however, is represented by the execution time, which is almost halved compared to the case of the reference scenario. As seen in previous scenario, an initial dispersion can be seen in the circled region, caused by the low motion noise itself.
 
 ![Scenario 03 result](./img/scenario-03.png)
 
@@ -182,7 +182,7 @@ This scenario aims to highlight any differences present in the trajectory identi
 | Initialization Type | ***Random*** |
 
 #### Results
-The graph highlights a peculiarity compared to all other scenarios: there is a line of points very distant from each other. These points describe the positions of the best particle during the first iterations of the particle filter. This behavior is due to the fact that, initially, the particles are very sparse and it is necessary to wait for the algorithm to attribute a greater weight to the most representative particles in order to stabilize the position; only once the best particles (i.e., those generated near the robot) are correctly weighted the particle filter proceed normally. Actually, this result shows a better tracking wrt GPS initialization, probably caused by a wider exploration of the solution space in the initial steps: this avoids the problem of the large dispersion seen in the previous scenarios.
+The graph highlights a peculiarity compared to all other scenarios: there is a line of points very distant from each other. These points describe the positions of the best particle during the first iterations of the particle filter. This behavior is due to the fact that, initially, the particles are very sparse and it is necessary to wait for the algorithm to attribute a greater weight to the most representative particles in order to stabilize the position; only once the best particles (i.e., those generated near the robot) are correctly weighted the particle filter proceed normally. Actually, this result shows a better tracking w.r.t. GPS initialization, probably caused by a wider exploration of the solution space in the initial steps: this avoids the problem of the large dispersion seen in the previous scenarios.
 
 It is also emphasized that the number of particles was set to 500 following some tests: using 100 particles, the algorithm converges with difficulty since the probability that a particle is generated near the robot is reduced; conversely, using 1000 particles, the system behavior becomes very similar to the scenario with GPS initialization as it is probable that a good number of particles are generated near the robot.
 
@@ -190,8 +190,8 @@ It is also emphasized that the number of particles was set to 500 following some
 
 ---
 
-### Scenario 05 - Comparison Between Different Resampling Methods
-In this scenario, we want to compare the execution times of the different resampling methods and, to accentuate any differences, a very high number of particles (5000) is used. In particular, two further resampling methods are considered: systematic and stratified.
+### Scenario 05 - Comparison between different resampling methods
+In this scenario, we want to compare the execution times of the different resampling methods and, to accentuate any differences, a very high number of particles (10000) is used. In particular, two further resampling methods are considered: systematic and stratified.
 
 #### Systematic Resampling
 This method involves creating an array representing the cumulative distribution of particle weights. The resampling occurs in this way:
@@ -243,7 +243,7 @@ By this scenario, we want to show the impact of a pretty big motion noise on bot
 | Initialization Type | From GPS |
 
 #### Results
-The result obtained shows a trajectory way more approximative compared to the previous scenarios: this is due to the fact that at each prediction step, the particles are spreaded in a larger area. However, the filter converges almost instantly without an initial "dispersive" phase, as noted in scenarios with less noise.
+The result obtained shows a trajectory way more approximative compared to the previous scenarios: this is due to the fact that at each prediction step, the particles are spread in a larger area. However, the filter converges almost instantly without an initial "dispersive" phase, as noted in scenarios with less noise.
 
 ![Scenario 06 result](./img/scenario-06.png)
 
@@ -264,20 +264,37 @@ This scenario aims to show the best solution found based on the previous describ
 | Initialization Type | From GPS |
 
 #### Results
-The achieved result can be considered the best one. It is based on a tradeoff between approximation, solution space exploration and execution time. The trajectory does not suffer from an initial dispersion and it tracks really good sudden angle variations.
+The achieved result can be considered the best one. It is based on a tradeoff between approximation, solution space exploration and execution time. The trajectory does not suffer from an initial dispersion and it tracks really well sudden angle variations.
 
 ![Optimal scenario](./img/optimal-scenario.png)
 
 ## Optional functionality: Adaptive Resampling implementation
-The objective of an adapative resampling is to adapt the resampling step based on the actual status of the particle filter. In the proposed implementation the adapative particle filter widen or narrow the area in which new particles are spreaded during the resampling step. More specifically, when the filter is stable the resampling variance is low, when the filter is degenerating (huge weight on few particles) the resampling variance is high. By this action, we want to promote the diversification of particles in case the filter is degenerating.
+The objective of an adapative resampling is to adapt the resampling step based on the actual status of the particle filter. In the proposed implementation the adapative particle filter widen or narrow the area in which new particles are spread during the resampling step. More specifically, when the filter is stable the resampling variance is low, when the filter is degenerating (huge weight on few particles) the resampling variance is high. By this action, we want to promote the diversification of particles in case the filter is degenerating.
 
 This implementation is based on the following paper: [A tutorial on particle filters for online nonlinear/non-Gaussian Bayesian tracking](https://ieeexplore.ieee.org/document/978374)
 
-It considers the ESS (Effective Sample Size) as a measure for the current performance of the filter. Ideally, ESS should have values close to N: this indicates that every particles have approximately the same weight and there is no danger of degeneration and/or impoverishment. Conversely, values close to 1 indicate that a tiny amount of particles have the majority of the weight. This last situation needs immediate attention in order to prevent the filter degeneration.
+It considers the ```ESS``` (Effective Sample Size) as a measure for the current performance of the filter. Ideally, ```ESS``` should have values close to N: this indicates that every particle has approximately the same weight and there is no danger of degeneration and/or impoverishment. Conversely, values close to 1 indicate that a tiny amount of particles have the majority of the weight. This last situation needs immediate attention in order to prevent the filter degeneration.
+
+The ````ESS```` value is used to compute the ```u``` value as ```1 - (ESS/N)```, which, the closer it is to zero, the better the filter is performing. A predefined resampling noise is applied to each particle in the resampling step based on the computed ```u``` value.
 
 ### Parameters
+| | X | Y | theta |
+| :--- | :---: | :---: | :---: |
+| Initialization Noise | 0.1 | 0.1 | 0.1 |
+| Motion Noise | 0.05 | 0.05 | 0.2 |
+| Sensor Noise | ***0.5*** | ***0.5*** | |
+
+| Parameter | Value |
+| :--- | :---: | 
+| Number of Particles | 1000 |
+| Resampling Algorithm | Wheel |
+| Initialization Type | From GPS |
 
 ### Results
+
+The achieved result is rather similar to the best solution found. Please note that for this scenario, a sensor noise of 0.5 on both axes. This is due to the behavior of the adaptive resampling itself: with too low noise on the sensor, we are implicitly promoting the impoverishment of the filter because the particle weight decrease exponentially with the distance. This results in a particle that has a tiny weight even if, actually, its distance from the best particle is not high. Increasing the sensor noise, the weight is spread in a much more "softly" manner, promoting the particle diversification.
+
+Please note that probably this method is not the optimal one for the used weight update formula, since even when the filter is working perfectly, the number of particles sampled is not even close to N, leading to an ```ESS``` close to 1. However, for this implementation's sake, a (custom) range of ```u``` has been used: the adaptive resampling plays a role just if the ```u``` value is greater than 0.95 (see the code for further details).
 
 ![Adapative resampling](./img/adaptive-resampling.png)
 
