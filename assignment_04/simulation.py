@@ -54,37 +54,38 @@ class Simulation:
         ])
         return dx
 
-##slide 13-15 pacco 3
-## a slide 15 considera da Dsin in poi come forza laterale pura e la prima forza come il carico che la rende dinamica
     def linear_single_track_model(self, ax, delta):
         """ Linear single-track model with aerodynamic and rolling resistance. """
-        
-        ##completare con equazioni vedi slide
-
+       
         # Tire slip angles
-        alpha_f = 0#
-        alpha_r = 0#
+        alpha_front = delta - (self.vy + self.l_f * self.r) / self.vx
+        alpha_rear = - (self.vy + self.l_r * self.r) / self.vx
+
+        F_n = self.mass * 9.81
 
         # Vertical forces (nominal vertical load)
-        Fz_f_nominal = 0#
-        Fz_r_nominal = 0#
+        Fz_front_nominal = (self.l_r / self.l_wb) * F_n
+        Fz_rear_nominal = (self.l_r / self.l_wb) * F_n
 
         # Front and rear lateral forces
-        Fyf = 0#
-        Fyr = 0#
+        Fy_front = Fz_front_nominal * self.D_front * np.sin(self.C_front * np.arctan(self.B_front * alpha_front - np.arctan(self.B_front * alpha_front)))
+        Fy_rear = Fz_rear_nominal * self.D_rear * np.sin(self.C_rear * np.arctan(self.B_rear * alpha_rear - np.arctan(self.B_rear * alpha_rear)))
 
         # Aerodynamic drag and rolling resistance forces
-        F_aero = 0#
+        F_aero = 0.5 * self.rho * self.C_d * self.A * (self.vx**2)
         F_roll = self.C_rr * self.mass * 9.81
 
+        # vy_front_component = ((2 * self.C_front) / self.mass) * (delta - (self.vy + self.l_f * self.r)/self.vx)
+        # vy_rear_component = ((2 * self.C_rear) / self.mass) * (- (self.vy + self.l_r * self.r)/self.vx)
+        
         # Dynamics equations
         dx = np.array([
-            0,  # dx/dt
-            0,  # dy/dt
-            0,                                                      # dtheta/dt
-            0,       # dvx/dt with resistive forces
-            0,                  # dvy/dt
-            0                # dr/dt
+        self.vx * np.cos(self.theta) - self.vy * np.sin(self.theta),                    # x_dot
+            self.vx * np.sin(self.theta) + self.vy * np.cos(self.theta),                # y_dot
+            self.r,                                                                     # theta_dot
+            ax + self.r * self.vy - (1/self.mass) * (F_aero + F_roll),                  # vx_dot
+            (1/self.mass) * (Fy_rear + Fy_front * np.cos(delta)) - self.r * self.vx     # vy_dot
+            (1/self.I_z) * (Fy_front * self.l_f * np.cos(delta) - Fy_rear * self.l_r)   # dr/dt
         ])
         
         return dx
