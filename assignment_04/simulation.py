@@ -24,7 +24,7 @@ class Simulation:
         self.x = 0                      # X position (m)
         self.y = 0                      # Y position (m)
         self.theta = 0                  # Heading angle (rad)
-        self.vx = 0.0                     # Longitudinal velocity (m/s)
+        self.vx = 0.0                   # Longitudinal velocity (m/s)
         self.vy = 0                     # Lateral velocity (m/s)
         self.r = 0                      # Yaw rate (rad/s)
 
@@ -37,22 +37,20 @@ class Simulation:
         self.cornering_stiffness_front = self.B_front*self.C_front*self.D_front
         self.cornering_stiffness_rear = self.B_rear*self.C_rear*self.D_rear  
 
-##slide 18 pacco 3
     def kinematic_model(self, ax, delta):
         """ Kinematic single-track model equations of motion. """
         
         # Aerodynamic drag and rolling resistance forces
-        F_aero = 0.0
+        F_aero = 0.5 * self.rho * self.C_d * self.A * (self.vx**2)
         F_roll = self.C_rr * self.mass * 9.81
         
-        ##completare con equazioni vedi slide
         dx = np.array([
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
+            self.vx * np.cos(self.theta) - self.vy * np.sin(self.theta),    # x_dot
+            self.vx * np.sin(self.theta) + self.vy * np.cos(self.theta),    # y_dot
+            self.vx * np.tan(delta) / self.l_wb,                            # theta_dot (heading)
+            ax + self.r * self.vy - (1/self.mass) * (F_aero + F_roll),      # vx_dot  
+            0,                                                              # vy_dot
+            0                                                               # r_dot (yaw_rate)
         ])
         return dx
 
