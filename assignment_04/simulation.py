@@ -29,11 +29,13 @@ class Simulation:
         self.r = 0                      # Yaw rate (rad/s)
 
         # Pacejka's Magic Formula coefficients
-        self.B, self.C, self.D, self.E = 0, 0 , 0, 0 ##mettere quelli del PDF
-        self.B_f, self.C_f, self.D_f, self.E_f = self.B, self.C, self.D, self.E
-        self.B_r, self.C_r, self.D_r, self.E_r = self.B, self.C, self.D, self.E
+        self.B, self.C, self.D, self.E = 7.1433, 1.3507, 1.0489, -0.0074722
+        self.B_front, self.C_front, self.D_front, self.E_front = self.B, self.C, self.D, self.E
+        self.B_rear, self.C_rear, self.D_rear, self.E_rear = self.B, self.C, self.D, self.E
         
-        self.Cf, self.Cr = self.B_f*self.C_f*self.D_f, self.B_r*self.C_r*self.D_r  # Cornering stiffness front/rear (N/rad)
+        # Cornering stiffness front/rear (N/rad)
+        self.cornering_stiffness_front = self.B_front*self.C_front*self.D_front
+        self.cornering_stiffness_rear = self.B_rear*self.C_rear*self.D_rear  
 
 ##slide 18 pacco 3
     def kinematic_model(self, ax, delta):
