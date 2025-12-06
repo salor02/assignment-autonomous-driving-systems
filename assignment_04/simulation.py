@@ -24,7 +24,7 @@ class Simulation:
         self.x = 0                      # X position (m)
         self.y = 0                      # Y position (m)
         self.theta = 0                  # Heading angle (rad)
-        self.vx = 10.0                  # Longitudinal velocity (m/s)
+        self.vx = 27.0                  # Longitudinal velocity (m/s)
         self.vy = 0                     # Lateral velocity (m/s)
         self.r = 0                      # Yaw rate (rad/s)
 
@@ -36,6 +36,12 @@ class Simulation:
         # Cornering stiffness front/rear (N/rad)
         self.cornering_stiffness_front = self.B_front*self.C_front*self.D_front
         self.cornering_stiffness_rear = self.B_rear*self.C_rear*self.D_rear  
+
+        # The following states are keeped for plotting, it is not needed to keep these values throughout the simulation
+        self.alpha_front = 0
+        self.alpha_rear = 0
+        self.Fy_front = 0
+        self.Fy_rear = 0
 
     def kinematic_model(self, ax, delta):
         """ Kinematic single-track model equations of motion. """
@@ -72,10 +78,10 @@ class Simulation:
 
         # Front and rear lateral forces computed based on the tire slip angles
         # This is the linear part (valid just for small slip angles)
-        alpha_front = delta - (self.vy + self.l_f * self.r) / self.vx
-        alpha_rear = - (self.vy - self.l_r * self.r) / self.vx
-        Fy_front = Fz_front_nominal * self.cornering_stiffness_front * alpha_front
-        Fy_rear = Fz_rear_nominal * self.cornering_stiffness_rear * alpha_rear
+        self.alpha_front = delta - (self.vy + self.l_f * self.r) / self.vx
+        self.alpha_rear = - (self.vy - self.l_r * self.r) / self.vx
+        self.Fy_front = Fz_front_nominal * self.cornering_stiffness_front * self.alpha_front
+        self.Fy_rear = Fz_rear_nominal * self.cornering_stiffness_rear * self.alpha_rear
 
         # Dynamics equations
         # The array is in the format [dx, dy, dtheta, dvx, dvy, dr]
@@ -83,9 +89,9 @@ class Simulation:
             self.vx * np.cos(self.theta) - self.vy * np.sin(self.theta),              
             self.vx * np.sin(self.theta) + self.vy * np.cos(self.theta),               
             self.r,                                                                    
-            (1/self.mass) * (Fx - Fy_front * np.sin(delta)) + self.vy * self.r,               
-            (1/self.mass) * (Fy_rear + Fy_front * np.cos(delta)) - self.r * self.vx,    
-            (1/self.I_z) * (Fy_front * self.l_f * np.cos(delta) - Fy_rear * self.l_r)   
+            (1/self.mass) * (Fx - self.Fy_front * np.sin(delta)) + self.vy * self.r,               
+            (1/self.mass) * (self.Fy_rear + self.Fy_front * np.cos(delta)) - self.r * self.vx,    
+            (1/self.I_z) * (self.Fy_front * self.l_f * np.cos(delta) - self.Fy_rear * self.l_r)   
         ])
         
         return dx
@@ -105,10 +111,10 @@ class Simulation:
 
         # Front and rear lateral forces computed based on the tire slip angles
         # This is the non-linear part, used to represent lateral forces beyond the "small slip angle" region
-        alpha_front = delta - np.arctan((self.vy + self.l_f * self.r) / self.vx)
-        alpha_rear = - np.arctan((self.vy - self.l_r * self.r) / self.vx)
-        Fy_front = Fz_front_nominal * self.D_front * np.sin(self.C_front * np.arctan(self.B_front * alpha_front - self.E_front * (self.B_front * alpha_front - np.arctan(self.B_front * alpha_front))))
-        Fy_rear = Fz_rear_nominal * self.D_rear * np.sin(self.C_rear * np.arctan(self.B_rear * alpha_rear - self.E_rear * (self.B_rear * alpha_rear - np.arctan(self.B_rear * alpha_rear))))
+        self.alpha_front = delta - np.arctan((self.vy + self.l_f * self.r) / self.vx)
+        self.alpha_rear = - np.arctan((self.vy - self.l_r * self.r) / self.vx)
+        self.Fy_front = Fz_front_nominal * self.D_front * np.sin(self.C_front * np.arctan(self.B_front * self.alpha_front - self.E_front * (self.B_front * self.alpha_front - np.arctan(self.B_front * self.alpha_front))))
+        self.Fy_rear = Fz_rear_nominal * self.D_rear * np.sin(self.C_rear * np.arctan(self.B_rear * self.alpha_rear - self.E_rear * (self.B_rear * self.alpha_rear - np.arctan(self.B_rear * self.alpha_rear))))
 
         # Dynamics equations
         # The array is in the format [dx, dy, dtheta, dvx, dvy, dr]
@@ -116,9 +122,9 @@ class Simulation:
         self.vx * np.cos(self.theta) - self.vy * np.sin(self.theta),    
             self.vx * np.sin(self.theta) + self.vy * np.cos(self.theta),   
             self.r,                                                                
-            (1/self.mass) * (Fx - Fy_front * np.sin(delta)) + self.vy * self.r,   
-            (1/self.mass) * (Fy_rear + Fy_front * np.cos(delta)) - self.r * self.vx, 
-            (1/self.I_z) * (Fy_front * self.l_f * np.cos(delta) - Fy_rear * self.l_r) 
+            (1/self.mass) * (Fx - self.Fy_front * np.sin(delta)) + self.vy * self.r,   
+            (1/self.mass) * (self.Fy_rear + self.Fy_front * np.cos(delta)) - self.r * self.vx, 
+            (1/self.I_z) * (self.Fy_front * self.l_f * np.cos(delta) - self.Fy_rear * self.l_r) 
         ])
         
         return dx

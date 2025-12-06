@@ -3,8 +3,6 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from simulation import Simulation
 
-##NEI RISULTATI ATTESI:
-#il modello lineare in 1b è differente da quello non lineare
 def plot_comparison(results, labels, title, xlabel, ylabel):
     """ Plot comparison of results for a specific state variable. """
     plt.figure(figsize=(10, 6))
@@ -28,7 +26,30 @@ def plot_trajectory(x_vals, y_vals, labels):
     plt.legend()
     plt.grid(True)
     plt.axis("equal")
-    plt.savefig("./img/trajectory.png", dpi=300, bbox_inches='tight')
+    plt.savefig("./img/Trajectory.png", dpi=300, bbox_inches='tight')
+
+# Please note: lateral_dynamic is a three-dimensions array: simulation -> data array -> specific unit data 
+def plot_lateral_forces(lateral_dynamic, labels):
+    """ Plot lateral force as a function of slip angle """
+    plt.figure(figsize=(10, 6))
+    for i, simulation in enumerate(lateral_dynamic):
+        plt.plot(simulation[1], simulation[0], label=labels[i])
+    plt.title("Front lateral force as function of slip angle")
+    plt.xlabel("Front lateral slip angle (rad)")
+    plt.ylabel("Front lateral force (N)")
+    plt.legend()
+    plt.grid(True)
+    plt.savefig("./img/Front Lateral Force vs Slip Angle.png", dpi=300, bbox_inches='tight')
+
+    plt.figure(figsize=(10, 6))
+    for i, simulation in enumerate(lateral_dynamic):
+        plt.plot(simulation[3], simulation[2], label=labels[i])
+    plt.title("Rear lateral force as function of slip angle")
+    plt.xlabel("Rear lateral slip angle (rad)")
+    plt.ylabel("Rear lateral force (N)")
+    plt.legend()
+    plt.grid(True)
+    plt.savefig("./img/Rear Lateral Force vs Slip Angle.png", dpi=300, bbox_inches='tight')
 
 
 def run_simulation(ax, steer, dt, integrator, model, steps=500):
@@ -45,6 +66,10 @@ def run_simulation(ax, steer, dt, integrator, model, steps=500):
     # Storage for state variables and slip angles
     x_vals, y_vals, theta_vals, vx_vals, vy_vals, r_vals = [], [], [], [], [], []
     alpha_f_vals, alpha_r_vals = [], []  # Slip angles
+    steer_vals = [] # Steering angle values
+    beta_vals = [] # Side slip angle values
+    lateral_force_front_vals, lateral_slip_angle_front_vals = [], []
+    lateral_force_rear_vals, lateral_slip_angle_rear_vals = [], []
 
     # Max steer and frequency for sinusoidal steer commands
     steer_max = 0.1
@@ -56,6 +81,7 @@ def run_simulation(ax, steer, dt, integrator, model, steps=500):
         # Calculate sinusoidal steering angle
         time = step * dt
         steer = steer_max * np.sin(2 * np.pi * frequency * time)  # Sinusoidal steering angle
+        steer_vals.append(steer)
 
         sim.integrate(ax, steer)
         
@@ -68,14 +94,25 @@ def run_simulation(ax, steer, dt, integrator, model, steps=500):
         r_vals.append(sim.r)
 
         # Calculate slip angles for front and rear tires 
-        ## vedi formula slide
-        alpha_f = 0.0  # Front tire slip angle
-        alpha_r = 0.0         # Rear tire slip angle
-
+        alpha_f = steer - np.arctan((sim.vy + sim.l_f * sim.r) / sim.vx)    # Front tire slip angle
+        alpha_r = - np.arctan((sim.vy - sim.l_r * sim.r) / sim.vx)          # Rear tire slip angle
         alpha_f_vals.append(alpha_f)
         alpha_r_vals.append(alpha_r)
 
-    return x_vals, y_vals, theta_vals, vx_vals, vy_vals, r_vals, alpha_f_vals, alpha_r_vals
+        # Calculate side slip angles
+        beta = np.arctan(sim.vy / sim.vx)
+        beta_vals.append(beta)
+
+        # Get lateral force/slip angle values
+        lateral_force_front_vals.append(sim.Fy_front)
+        lateral_slip_angle_front_vals.append(sim.alpha_front)
+        lateral_force_rear_vals.append(sim.Fy_rear)
+        lateral_slip_angle_rear_vals.append(sim.alpha_rear)
+
+    # Here four arrays are packed in one just for readability purpose
+    lateral_dynamic = [lateral_force_front_vals, lateral_slip_angle_front_vals, lateral_force_rear_vals, lateral_slip_angle_rear_vals]
+    
+    return x_vals, y_vals, theta_vals, vx_vals, vy_vals, r_vals, alpha_f_vals, alpha_r_vals, steer_vals, beta_vals, lateral_dynamic
 
 def main():
     # Simulation parameters
@@ -116,6 +153,9 @@ def main():
     r_results = [result[5] for result in all_results]
     alpha_f_results = [result[6] for result in all_results]
     alpha_r_results = [result[7] for result in all_results]
+    steer_results = [result[8] for result in all_results]
+    beta_results = [result[9] for result in all_results]
+    lateral_dynamic = [result[10] for result in all_results]
 
     # Plot comparisons for each state variable
     plot_trajectory(x_results, y_results, labels)
@@ -125,6 +165,9 @@ def main():
     plot_comparison(r_results, labels, "Yaw Rate Comparison", "Time Step", "Yaw Rate (rad/s)")
     plot_comparison(alpha_f_results, labels, "Front Slip Angle Comparison", "Time Step", "Slip Angle (rad) - Front")
     plot_comparison(alpha_r_results, labels, "Rear Slip Angle Comparison", "Time Step", "Slip Angle (rad) - Rear")
+    plot_comparison(steer_results, labels, "Steering Angle Comparison", "Time Step", "Steering Angle (rad)")
+    plot_comparison(beta_results, labels, "Side Slip Angle Comparison", "Time Step", "Side Slip Angle (rad)")
+    plot_lateral_forces(lateral_dynamic, labels)
 
 if __name__ == "__main__":
     main()
