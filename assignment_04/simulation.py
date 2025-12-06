@@ -24,7 +24,7 @@ class Simulation:
         self.x = 0                      # X position (m)
         self.y = 0                      # Y position (m)
         self.theta = 0                  # Heading angle (rad)
-        self.vx = 0.0                   # Longitudinal velocity (m/s)
+        self.vx = 10.0                  # Longitudinal velocity (m/s)
         self.vy = 0                     # Lateral velocity (m/s)
         self.r = 0                      # Yaw rate (rad/s)
 
@@ -40,52 +40,52 @@ class Simulation:
     def kinematic_model(self, ax, delta):
         """ Kinematic single-track model equations of motion. """
         
-        # Aerodynamic drag and rolling resistance forces
+        # Total longitudinal force including aerodynamic drag and rolling resistance forces
         F_aero = 0.5 * self.rho * self.C_d * self.A * (self.vx**2)
         F_roll = self.C_rr * self.mass * 9.81
+        Fx = ax * self.mass - (F_aero + F_roll)
         
+        # The array is in the format [dx, dy, dtheta, dvx, dvy, dr]
         dx = np.array([
-            self.vx * np.cos(self.theta) - self.vy * np.sin(self.theta),    # x_dot
-            self.vx * np.sin(self.theta) + self.vy * np.cos(self.theta),    # y_dot
-            self.vx * np.tan(delta) / self.l_wb,                            # theta_dot (heading)
-            ax + self.r * self.vy - (1/self.mass) * (F_aero + F_roll),      # vx_dot  
-            0,                                                              # vy_dot
-            0                                                               # r_dot (yaw_rate)
+            self.vx * np.cos(self.theta) - self.vy * np.sin(self.theta),    
+            self.vx * np.sin(self.theta) + self.vy * np.cos(self.theta),    
+            self.vx * np.tan(delta) / self.l_wb,                            
+            (1/self.mass) * Fx + self.r * self.vy,      
+            0,                                                              
+            0                                                               
         ])
+
         return dx
 
     def linear_single_track_model(self, ax, delta):
         """ Linear single-track model with aerodynamic and rolling resistance. """
-       
-        # Tire slip angles
-        alpha_front = delta - (self.vy + self.l_f * self.r) / self.vx
-        alpha_rear = - (self.vy + self.l_r * self.r) / self.vx
 
-        F_n = self.mass * 9.81
+        # Total longitudinal force including aerodynamic drag and rolling resistance forces
+        F_aero = 0.5 * self.rho * self.C_d * self.A * (self.vx**2)
+        F_roll = self.C_rr * self.mass * 9.81
+        Fx = ax * self.mass - (F_aero + F_roll)
 
         # Vertical forces (nominal vertical load)
+        F_n = self.mass * 9.81
         Fz_front_nominal = (self.l_r / self.l_wb) * F_n
         Fz_rear_nominal = (self.l_f / self.l_wb) * F_n
 
-        # Front and rear lateral forces
+        # Front and rear lateral forces computed based on the tire slip angles
+        # This is the linear part (valid just for small slip angles)
+        alpha_front = delta - (self.vy + self.l_f * self.r) / self.vx
+        alpha_rear = - (self.vy - self.l_r * self.r) / self.vx
         Fy_front = Fz_front_nominal * self.cornering_stiffness_front * alpha_front
         Fy_rear = Fz_rear_nominal * self.cornering_stiffness_rear * alpha_rear
 
-        # Aerodynamic drag and rolling resistance forces
-        F_aero = 0.5 * self.rho * self.C_d * self.A * (self.vx**2)
-        F_roll = self.C_rr * self.mass * 9.81
-
-        # vy_front_component = ((2 * self.C_front) / self.mass) * (delta - (self.vy + self.l_f * self.r)/self.vx)
-        # vy_rear_component = ((2 * self.C_rear) / self.mass) * (- (self.vy + self.l_r * self.r)/self.vx)
-        
         # Dynamics equations
+        # The array is in the format [dx, dy, dtheta, dvx, dvy, dr]
         dx = np.array([
-        self.vx * np.cos(self.theta) - self.vy * np.sin(self.theta),                    # x_dot
-            self.vx * np.sin(self.theta) + self.vy * np.cos(self.theta),                # y_dot
-            self.r,                                                                     # theta_dot
-            ax + self.r * self.vy - (1/self.mass) * (F_aero + F_roll),                  # vx_dot
-            (1/self.mass) * (Fy_rear + Fy_front * np.cos(delta)) - self.r * self.vx     # vy_dot
-            (1/self.I_z) * (Fy_front * self.l_f * np.cos(delta) - Fy_rear * self.l_r)   # dr/dt
+            self.vx * np.cos(self.theta) - self.vy * np.sin(self.theta),              
+            self.vx * np.sin(self.theta) + self.vy * np.cos(self.theta),               
+            self.r,                                                                    
+            (1/self.mass) * (Fx - Fy_front * np.sin(delta)) + self.vy * self.r,               
+            (1/self.mass) * (Fy_rear + Fy_front * np.cos(delta)) - self.r * self.vx,    
+            (1/self.I_z) * (Fy_front * self.l_f * np.cos(delta) - Fy_rear * self.l_r)   
         ])
         
         return dx
@@ -93,32 +93,32 @@ class Simulation:
     def nonlinear_single_track_model(self, ax, delta):
         """ Nonlinear single-track model with aerodynamic and rolling resistance. """
 
-        # Tire slip angles
-        alpha_front = delta - np.arctan((self.vy + self.l_f * self.r) / self.vx)
-        alpha_rear = - np.arctan((self.vy - self.l_r * self.r) / self.vx)
-
-        F_n = self.mass * 9.81
+        # Total longitudinal force including aerodynamic drag and rolling resistance forces
+        F_aero = 0.5 * self.rho * self.C_d * self.A * (self.vx**2)
+        F_roll = self.C_rr * self.mass * 9.81
+        Fx = ax * self.mass - (F_aero + F_roll)
 
         # Vertical forces (nominal vertical load)
+        F_n = self.mass * 9.81
         Fz_front_nominal = (self.l_r / self.l_wb) * F_n
         Fz_rear_nominal = (self.l_f / self.l_wb) * F_n
 
-        # Front and rear lateral forces
-        Fy_front = Fz_front_nominal * self.D_front * np.sin(self.C_front * np.arctan(self.B_front * alpha_front - np.arctan(self.B_front * alpha_front)))
-        Fy_rear = Fz_rear_nominal * self.D_rear * np.sin(self.C_rear * np.arctan(self.B_rear * alpha_rear - np.arctan(self.B_rear * alpha_rear)))
-
-        # Aerodynamic drag and rolling resistance forces
-        F_aero = 0.5 * self.rho * self.C_d * self.A * (self.vx**2)
-        F_roll = self.C_rr * self.mass * 9.81
+        # Front and rear lateral forces computed based on the tire slip angles
+        # This is the non-linear part, used to represent lateral forces beyond the "small slip angle" region
+        alpha_front = delta - np.arctan((self.vy + self.l_f * self.r) / self.vx)
+        alpha_rear = - np.arctan((self.vy - self.l_r * self.r) / self.vx)
+        Fy_front = Fz_front_nominal * self.D_front * np.sin(self.C_front * np.arctan(self.B_front * alpha_front - self.E_front * (self.B_front * alpha_front - np.arctan(self.B_front * alpha_front))))
+        Fy_rear = Fz_rear_nominal * self.D_rear * np.sin(self.C_rear * np.arctan(self.B_rear * alpha_rear - self.E_rear * (self.B_rear * alpha_rear - np.arctan(self.B_rear * alpha_rear))))
 
         # Dynamics equations
+        # The array is in the format [dx, dy, dtheta, dvx, dvy, dr]
         dx = np.array([
-        self.vx * np.cos(self.theta) - self.vy * np.sin(self.theta),                    # x_dot
-            self.vx * np.sin(self.theta) + self.vy * np.cos(self.theta),                # y_dot
-            self.r,                                                                     # theta_dot
-            ax + self.r * self.vy - (1/self.mass) * (F_aero + F_roll),                  # vx_dot
-            (1/self.mass) * (Fy_rear + Fy_front * np.cos(delta)) - self.r * self.vx     # vy_dot
-            (1/self.I_z) * (Fy_front * self.l_f * np.cos(delta) - Fy_rear * self.l_r)   # dr/dt
+        self.vx * np.cos(self.theta) - self.vy * np.sin(self.theta),    
+            self.vx * np.sin(self.theta) + self.vy * np.cos(self.theta),   
+            self.r,                                                                
+            (1/self.mass) * (Fx - Fy_front * np.sin(delta)) + self.vy * self.r,   
+            (1/self.mass) * (Fy_rear + Fy_front * np.cos(delta)) - self.r * self.vx, 
+            (1/self.I_z) * (Fy_front * self.l_f * np.cos(delta) - Fy_rear * self.l_r) 
         ])
         
         return dx

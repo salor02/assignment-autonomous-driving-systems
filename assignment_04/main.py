@@ -15,7 +15,7 @@ def plot_comparison(results, labels, title, xlabel, ylabel):
     plt.ylabel(ylabel)
     plt.legend()
     plt.grid(True)
-    plt.show()
+    plt.savefig("./img/" + title + ".png", dpi=300, bbox_inches='tight')
 
 def plot_trajectory(x_vals, y_vals, labels):
     """ Plot 2D trajectory (x vs y) for all simulation configurations. """
@@ -28,7 +28,8 @@ def plot_trajectory(x_vals, y_vals, labels):
     plt.legend()
     plt.grid(True)
     plt.axis("equal")
-    plt.show()
+    plt.savefig("./img/trajectory.png", dpi=300, bbox_inches='tight')
+
 
 def run_simulation(ax, steer, dt, integrator, model, steps=500):
     """ Run a simulation with the given parameters and return all states. """
@@ -53,8 +54,8 @@ def run_simulation(ax, steer, dt, integrator, model, steps=500):
 
         # Make one step simulation via model integration
         # Calculate sinusoidal steering angle
-        #time = step * dt
-        # steer = steer_max * np.sin(2 * np.pi * frequency * time)  # Sinusoidal steering angle
+        time = step * dt
+        steer = steer_max * np.sin(2 * np.pi * frequency * time)  # Sinusoidal steering angle
 
         sim.integrate(ax, steer)
         
@@ -78,10 +79,10 @@ def run_simulation(ax, steer, dt, integrator, model, steps=500):
 
 def main():
     # Simulation parameters
-    dt = 0.0        # Time step (s)
-    ax = 0.0            # Constant longitudinal acceleration (m/s^2)
+    dt = 0.001       # Time step (s)
+    ax = 1.0            # Constant longitudinal acceleration (m/s^2)
     steer = 0.0         # Constant steering angle (rad)
-    sim_time = 0.0      # Simulation duration in seconds
+    sim_time = 5.0      # Simulation duration in seconds
     steps = int(sim_time / dt)  # Simulation steps (30 seconds)
 
     # List of configurations
@@ -97,6 +98,10 @@ def main():
     # Run each simulation and store the results
     all_results = []
     labels = []
+
+    # Each results is an array of subsequent states of a variable, for example in result[0] there will be the array corresponding
+    # to the X coord. Then, in all_results will be a matrix of arrays: one line for each simulation and one cell for each subsequent values
+    # of a state in that simulation.
     for integrator, model in configs:
         results = run_simulation(ax, steer, dt, integrator, model, steps)
         all_results.append(results)
