@@ -11,6 +11,7 @@ class Simulation:
         self.mass = mass                # Vehicle mass (kg)
         self.I_z = Iz                   # Yaw moment of inertia (kg*m^2)
         self.dt = dt                    # Time step (s)
+        self.sinusoidal_steer = False    # Sinusoidal steer (True/False)
         self.integrator = integrator    # Integrator choice
         self.model = model              # Model choice
         
@@ -24,104 +25,121 @@ class Simulation:
         self.x = 0                      # X position (m)
         self.y = 0                      # Y position (m)
         self.theta = 0                  # Heading angle (rad)
-        self.vx = 0.0                     # Longitudinal velocity (m/s)
+        self.vx = 24.0                  # Longitudinal velocity (m/s)
         self.vy = 0                     # Lateral velocity (m/s)
         self.r = 0                      # Yaw rate (rad/s)
 
         # Pacejka's Magic Formula coefficients
-        self.B, self.C, self.D, self.E = 0, 0 , 0, 0 ##mettere quelli del PDF
-        self.B_f, self.C_f, self.D_f, self.E_f = self.B, self.C, self.D, self.E
-        self.B_r, self.C_r, self.D_r, self.E_r = self.B, self.C, self.D, self.E
+        self.B, self.C, self.D, self.E = 7.1433, 1.3507, 1.0489, -0.0074722
+        self.B_front, self.C_front, self.D_front, self.E_front = self.B, self.C, self.D, self.E
+        self.B_rear, self.C_rear, self.D_rear, self.E_rear = self.B, self.C, self.D, self.E
         
-        self.Cf, self.Cr = self.B_f*self.C_f*self.D_f, self.B_r*self.C_r*self.D_r  # Cornering stiffness front/rear (N/rad)
+        # Cornering stiffness front/rear (N/rad)
+        self.cornering_stiffness_front = self.B_front*self.C_front*self.D_front
+        self.cornering_stiffness_rear = self.B_rear*self.C_rear*self.D_rear  
 
-##slide 18 pacco 3
+        # The following states are kept for plotting, keeping these values is not needed throughout the simulation
+        self.alpha_front = 0
+        self.alpha_rear = 0
+        self.Fy_front = 0
+        self.Fy_rear = 0
+        self.beta = 0
+
     def kinematic_model(self, ax, delta):
         """ Kinematic single-track model equations of motion. """
         
-        # Aerodynamic drag and rolling resistance forces
-        F_aero = 0.0
+        # Total longitudinal force including aerodynamic drag and rolling resistance forces
+        F_aero = 0.5 * self.rho * self.C_d * self.A * (self.vx**2)
         F_roll = self.C_rr * self.mass * 9.81
+        Fx = ax * self.mass - (F_aero + F_roll)
+
+        # Side slip angle
+        self.beta = np.arctan(self.vy / self.vx)
         
-        ##completare con equazioni vedi slide
+        # The array is in the format [dx, dy, dtheta, dvx, dvy, dr]
         dx = np.array([
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
+            self.vx * np.cos(self.theta) - self.vy * np.sin(self.theta),    
+            self.vx * np.sin(self.theta) + self.vy * np.cos(self.theta),    
+            self.vx * np.tan(delta) / self.l_wb,                            
+            (1/self.mass) * Fx + self.r * self.vy,      
+            0,                                                              
+            0                                                               
         ])
+
         return dx
 
-##slide 13-15 pacco 3
-## a slide 15 considera da Dsin in poi come forza laterale pura e la prima forza come il carico che la rende dinamica
     def linear_single_track_model(self, ax, delta):
         """ Linear single-track model with aerodynamic and rolling resistance. """
-        
-        ##completare con equazioni vedi slide
 
-        # Tire slip angles
-        alpha_f = 0#
-        alpha_r = 0#
+        # Total longitudinal force including aerodynamic drag and rolling resistance forces
+        F_aero = 0.5 * self.rho * self.C_d * self.A * (self.vx**2)
+        F_roll = self.C_rr * self.mass * 9.81
+        Fx = ax * self.mass - (F_aero + F_roll)
 
         # Vertical forces (nominal vertical load)
-        Fz_f_nominal = 0#
-        Fz_r_nominal = 0#
+        F_n = self.mass * 9.81
+        Fz_front_nominal = (self.l_r / self.l_wb) * F_n
+        Fz_rear_nominal = (self.l_f / self.l_wb) * F_n
 
-        # Front and rear lateral forces
-        Fyf = 0#
-        Fyr = 0#
+        # Side slip angle
+        self.beta = np.arctan(self.vy / self.vx)
 
-        # Aerodynamic drag and rolling resistance forces
-        F_aero = 0#
-        F_roll = self.C_rr * self.mass * 9.81
+        # Front and rear lateral forces computed based on the tire slip angles
+        # This is the linear part (valid just for small slip angles)
+        self.alpha_front = delta - (self.vy + self.l_f * self.r) / self.vx
+        self.alpha_rear = - (self.vy - self.l_r * self.r) / self.vx
+        self.Fy_front = Fz_front_nominal * self.cornering_stiffness_front * self.alpha_front
+        self.Fy_rear = Fz_rear_nominal * self.cornering_stiffness_rear * self.alpha_rear
 
         # Dynamics equations
+        # The array is in the format [dx, dy, dtheta, dvx, dvy, dr]
         dx = np.array([
-            0,  # dx/dt
-            0,  # dy/dt
-            0,                                                      # dtheta/dt
-            0,       # dvx/dt with resistive forces
-            0,                  # dvy/dt
-            0                # dr/dt
+            self.vx * np.cos(self.theta) - self.vy * np.sin(self.theta),              
+            self.vx * np.sin(self.theta) + self.vy * np.cos(self.theta),               
+            self.r,                                                                    
+            (1/self.mass) * (Fx - self.Fy_front * np.sin(delta)) + self.vy * self.r,               
+            (1/self.mass) * (self.Fy_rear + self.Fy_front * np.cos(delta)) - self.r * self.vx,    
+            (1/self.I_z) * (self.Fy_front * self.l_f * np.cos(delta) - self.Fy_rear * self.l_r)   
         ])
         
         return dx
 
     def nonlinear_single_track_model(self, ax, delta):
         """ Nonlinear single-track model with aerodynamic and rolling resistance. """
-        ##completare con equazioni vedi slide
 
-        # Tire slip angles
-        alpha_f = 0#
-        alpha_r = 0#
+        # Total longitudinal force including aerodynamic drag and rolling resistance forces
+        F_aero = 0.5 * self.rho * self.C_d * self.A * (self.vx**2)
+        F_roll = self.C_rr * self.mass * 9.81
+        Fx = ax * self.mass - (F_aero + F_roll)
 
         # Vertical forces (nominal vertical load)
-        Fz_f_nominal = 0#
-        Fz_r_nominal = 0#
+        F_n = self.mass * 9.81
+        Fz_front_nominal = (self.l_r / self.l_wb) * F_n
+        Fz_rear_nominal = (self.l_f / self.l_wb) * F_n
 
-        # Front and rear lateral forces
-        Fyf = 0#
-        Fyr = 0#
+        # Side slip angle
+        self.beta = np.arctan(self.vy / self.vx)
 
-        # Aerodynamic drag and rolling resistance forces
-        F_aero = 0#
-        F_roll = self.C_rr * self.mass * 9.81
+        # Front and rear lateral forces computed based on the tire slip angles
+        # This is the non-linear part, used to represent lateral forces beyond the "small slip angle" region
+        self.alpha_front = delta - np.arctan((self.vy + self.l_f * self.r) / self.vx)
+        self.alpha_rear = - np.arctan((self.vy - self.l_r * self.r) / self.vx)
+        self.Fy_front = Fz_front_nominal * self.D_front * np.sin(self.C_front * np.arctan(self.B_front * self.alpha_front - self.E_front * (self.B_front * self.alpha_front - np.arctan(self.B_front * self.alpha_front))))
+        self.Fy_rear = Fz_rear_nominal * self.D_rear * np.sin(self.C_rear * np.arctan(self.B_rear * self.alpha_rear - self.E_rear * (self.B_rear * self.alpha_rear - np.arctan(self.B_rear * self.alpha_rear))))
 
         # Dynamics equations
+        # The array is in the format [dx, dy, dtheta, dvx, dvy, dr]
         dx = np.array([
-            0,  # dx/dt
-            0,  # dy/dt
-            0,                                                      # dtheta/dt
-            0,       # dvx/dt with resistive forces
-            0,                  # dvy/dt
-            0                # dr/dt
+        self.vx * np.cos(self.theta) - self.vy * np.sin(self.theta),    
+            self.vx * np.sin(self.theta) + self.vy * np.cos(self.theta),   
+            self.r,                                                                
+            (1/self.mass) * (Fx - self.Fy_front * np.sin(delta)) + self.vy * self.r,   
+            (1/self.mass) * (self.Fy_rear + self.Fy_front * np.cos(delta)) - self.r * self.vx, 
+            (1/self.I_z) * (self.Fy_front * self.l_f * np.cos(delta) - self.Fy_rear * self.l_r) 
         ])
         
         return dx
 
-###questa parte in poi è gia completa
     def integrate(self, ax, delta):
         """ Select the integrator method and apply it to update the state. """
         if self.integrator == "euler":
