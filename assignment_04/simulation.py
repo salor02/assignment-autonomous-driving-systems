@@ -11,6 +11,7 @@ class Simulation:
         self.mass = mass                # Vehicle mass (kg)
         self.I_z = Iz                   # Yaw moment of inertia (kg*m^2)
         self.dt = dt                    # Time step (s)
+        self.sinusoidal_steer = False    # Sinusoidal steer (True/False)
         self.integrator = integrator    # Integrator choice
         self.model = model              # Model choice
         
@@ -37,11 +38,12 @@ class Simulation:
         self.cornering_stiffness_front = self.B_front*self.C_front*self.D_front
         self.cornering_stiffness_rear = self.B_rear*self.C_rear*self.D_rear  
 
-        # The following states are keeped for plotting, it is not needed to keep these values throughout the simulation
+        # The following states are kept for plotting, keeping these values is not needed throughout the simulation
         self.alpha_front = 0
         self.alpha_rear = 0
         self.Fy_front = 0
         self.Fy_rear = 0
+        self.beta = 0
 
     def kinematic_model(self, ax, delta):
         """ Kinematic single-track model equations of motion. """
@@ -50,6 +52,9 @@ class Simulation:
         F_aero = 0.5 * self.rho * self.C_d * self.A * (self.vx**2)
         F_roll = self.C_rr * self.mass * 9.81
         Fx = ax * self.mass - (F_aero + F_roll)
+
+        # Side slip angle
+        self.beta = np.arctan(self.vy / self.vx)
         
         # The array is in the format [dx, dy, dtheta, dvx, dvy, dr]
         dx = np.array([
@@ -75,6 +80,9 @@ class Simulation:
         F_n = self.mass * 9.81
         Fz_front_nominal = (self.l_r / self.l_wb) * F_n
         Fz_rear_nominal = (self.l_f / self.l_wb) * F_n
+
+        # Side slip angle
+        self.beta = np.arctan(self.vy / self.vx)
 
         # Front and rear lateral forces computed based on the tire slip angles
         # This is the linear part (valid just for small slip angles)
@@ -108,6 +116,9 @@ class Simulation:
         F_n = self.mass * 9.81
         Fz_front_nominal = (self.l_r / self.l_wb) * F_n
         Fz_rear_nominal = (self.l_f / self.l_wb) * F_n
+
+        # Side slip angle
+        self.beta = np.arctan(self.vy / self.vx)
 
         # Front and rear lateral forces computed based on the tire slip angles
         # This is the non-linear part, used to represent lateral forces beyond the "small slip angle" region
