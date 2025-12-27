@@ -77,4 +77,4 @@ class PIDController:
         self.previous_error = error
         self.previous_output = output
         
-        return output
+        return output, error

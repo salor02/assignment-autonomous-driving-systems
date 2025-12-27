@@ -122,8 +122,9 @@ class Simulation:
 
         # Front and rear lateral forces computed based on the tire slip angles
         # This is the non-linear part, used to represent lateral forces beyond the "small slip angle" region
-        self.alpha_front = delta - np.arctan((self.vy + self.l_f * self.r) / self.vx)
-        self.alpha_rear = - np.arctan((self.vy - self.l_r * self.r) / self.vx)
+        # Please note: in order to make the model works for small velocities too, a minimum value of 0.5 has been set for the denominator
+        self.alpha_front = delta - np.arctan((self.vy + self.l_f * self.r) / max(0.5, self.vx))
+        self.alpha_rear = - np.arctan((self.vy - self.l_r * self.r) / max(0.5, self.vx))
         self.Fy_front = Fz_front_nominal * self.D_front * np.sin(self.C_front * np.arctan(self.B_front * self.alpha_front - self.E_front * (self.B_front * self.alpha_front - np.arctan(self.B_front * self.alpha_front))))
         self.Fy_rear = Fz_rear_nominal * self.D_rear * np.sin(self.C_rear * np.arctan(self.B_rear * self.alpha_rear - self.E_rear * (self.B_rear * self.alpha_rear - np.arctan(self.B_rear * self.alpha_rear))))
 

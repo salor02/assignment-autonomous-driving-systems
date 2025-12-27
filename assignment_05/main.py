@@ -71,7 +71,7 @@ def plot_comparison(results, labels, title, xlabel, ylabel):
     plt.ylabel(ylabel)
     plt.legend()
     plt.grid(True)
-    plt.show()
+    plt.savefig("./img/" + title + ".png", dpi=300, bbox_inches='tight')
 
 def plot_trajectory(x_vals, y_vals, labels, path_spline):
     """ Plot 2D trajectory (x vs y) for all simulation configurations and path_spline trajectory. """
@@ -93,7 +93,21 @@ def plot_trajectory(x_vals, y_vals, labels, path_spline):
     plt.legend()
     plt.grid(True)
     plt.axis("equal")
-    plt.show()
+    plt.savefig("./img/Trajectory.png", dpi=300, bbox_inches='tight')
+
+# This function plots the Fy vs alpha graphs
+def plot_lateral_force(Fy, alpha, labels, force_type):
+    """ Plot lateral force as a function of slip angle """
+    plt.figure(figsize=(10, 6))
+    for i, simulation in enumerate(Fy):
+        plt.plot(alpha[i], Fy[i], label=labels[i])
+    plt.title(force_type + " lateral force as function of slip angle")
+    plt.xlabel(force_type + " lateral slip angle (rad)")
+    plt.ylabel(force_type + " lateral force (N)")
+    plt.legend()
+    plt.grid(True)
+    plt.savefig("./img/" + force_type + " Lateral Force vs Slip Angle.png", dpi=300, bbox_inches='tight')
+
 
 def run_simulation(ax, steer, dt, integrator, model, steps=500):
     """ Run a simulation with the given parameters and return all states. """
@@ -101,9 +115,24 @@ def run_simulation(ax, steer, dt, integrator, model, steps=500):
     # Initialize the simulation
     sim = Simulation(lf, lr, mass, Iz, dt, integrator=integrator, model=model)
 
-    # Storage for state variables and slip angles
-    x_vals, y_vals, theta_vals, vx_vals, vy_vals, r_vals = [], [], [], [], [], []
-    alpha_f_vals, alpha_r_vals = [], []  # Slip angles
+    # Storage for state variables and slip angles    
+    results = {
+        "x": [],
+        "y": [],
+        "theta": [],
+        "vx": [],
+        "vy": [],
+        "r": [], # yaw rate
+        "alpha_front": [], # front tires slip angle
+        "alpha_rear": [], # rear tires slip angle
+        "steer": [], # steering angle (delta)
+        "beta": [], # side slip angle
+        "Fy_front": [], # front tires lateral force
+        "Fy_rear": [], # rear tires lateral force
+        "ax": [], # acceleration
+        "velocity_error": [], # error w.r.t. target speed
+        "lateral_error": [], # position error w.r.t. path 
+    }
 
     casadi_model()
 
@@ -113,7 +142,7 @@ def run_simulation(ax, steer, dt, integrator, model, steps=500):
         print("Time:", step*dt)
 
         # Calculate ax to track speed
-        ax = long_control_pid.compute(target_speed, sim.vx, dt) # Exercise 1
+        ax, velocity_error = long_control_pid.compute(target_speed, sim.vx, dt) # Exercise 1
         # steer = 0 # Exercise 1 only
 
         # Update actual frenet-frame position in the spline
@@ -175,21 +204,27 @@ def run_simulation(ax, steer, dt, integrator, model, steps=500):
         sim.integrate(ax, float(steer))
         
         # Append each state to corresponding list
-        x_vals.append(sim.x)
-        y_vals.append(sim.y)
-        theta_vals.append(sim.theta)
-        vx_vals.append(sim.vx)
-        vy_vals.append(sim.vy)
-        r_vals.append(sim.r)
+        results["x"].append(sim.x)
+        results["y"].append(sim.y)
+        results["theta"].append(sim.theta)
+        results["vx"].append(sim.vx)
+        results["vy"].append(sim.vy)
+        results["r"].append(sim.r)
 
-        # Calculate slip angles for front and rear tires
-        alpha_f = steer - np.arctan((sim.vy + sim.l_f * sim.r) / max(0.5, sim.vx))  # Front tire slip angle
-        alpha_r = -(np.arctan(sim.vy - sim.l_r * sim.r) / max(0.5, sim.vx))         # Rear tire slip angle
+        # Get other simulation values
+        results["alpha_front"].append(sim.alpha_front)
+        results["alpha_rear"].append(sim.alpha_rear)
+        results["steer"].append(steer)
+        results["beta"].append(sim.beta)
+        results["Fy_front"].append(sim.Fy_front)
+        results["Fy_rear"].append(sim.Fy_rear)
+        results["ax"].append(ax)
 
-        alpha_f_vals.append(alpha_f)
-        alpha_r_vals.append(alpha_r)
+        # Errors
+        results["velocity_error"].append(velocity_error)
+        results["lateral_error"].append(local_error)
 
-    return x_vals, y_vals, theta_vals, vx_vals, vy_vals, r_vals, alpha_f_vals, alpha_r_vals
+    return results
 
 def main():
 
@@ -202,29 +237,47 @@ def main():
     all_results = []
     actual_state = []
     labels = []
+
+    # Each results is an array of subsequent states of a variable, for example in result[0] there will be the array corresponding
+    # to the X coord. Then, in all_results will be a matrix of arrays: one line for each simulation and one cell for each subsequent values
+    # of a state in that simulation.
     for integrator, model in configs:
-        actual_state = run_simulation(ax, steer, dt, integrator, model, steps)
-        all_results.append(actual_state)
+        results = run_simulation(ax, steer, dt, integrator, model, steps)
+        all_results.append(results)
         labels.append(f"{integrator.capitalize()} - {model.capitalize()}")
 
-    # Separate each state for plotting
-    x_results = [result[0] for result in all_results]
-    y_results = [result[1] for result in all_results]
-    theta_results = [result[2] for result in all_results]
-    vx_results = [result[3] for result in all_results]
-    vy_results = [result[4] for result in all_results]
-    r_results = [result[5] for result in all_results]
-    alpha_f_results = [result[6] for result in all_results]
-    alpha_r_results = [result[7] for result in all_results]
+    # Separate each value for plotting
+    x_results = [result["x"] for result in all_results]
+    y_results = [result["y"] for result in all_results]
+    theta_results = [result["theta"] for result in all_results]
+    vx_results = [result["vx"] for result in all_results]
+    vy_results = [result["vy"] for result in all_results]
+    r_results = [result["r"] for result in all_results]
+    alpha_front_results = [result["alpha_front"] for result in all_results]
+    alpha_rear_results = [result["alpha_rear"] for result in all_results]
+    steer_results = [result["steer"] for result in all_results]
+    beta_results = [result["beta"] for result in all_results]
+    Fy_front_results = [result["Fy_front"] for result in all_results]
+    Fy_rear_results = [result["Fy_rear"] for result in all_results]
+    ax_results = [result["ax"] for result in all_results]
+    velocity_error_results = [result["velocity_error"] for result in all_results]
+    lateral_error_results = [result["lateral_error"] for result in all_results]
 
-    # Plot comparisons for each state variable
+    # Plot comparisons for each simulation value
     plot_trajectory(x_results, y_results, labels, path_spline)
-    plot_comparison(theta_results, labels, "Heading Angle Comparison", "Time Step", "Heading Angle (rad)")
+    # plot_comparison(theta_results, labels, "Heading Angle Comparison", "Time Step", "Heading Angle (rad)")
     plot_comparison(vx_results, labels, "Longitudinal Velocity Comparison", "Time Step", "Velocity (m/s)")
     plot_comparison(vy_results, labels, "Lateral Velocity Comparison", "Time Step", "Lateral Velocity (m/s)")
-    plot_comparison(r_results, labels, "Yaw Rate Comparison", "Time Step", "Yaw Rate (rad/s)")
-    plot_comparison(alpha_f_results, labels, "Front Slip Angle Comparison", "Time Step", "Slip Angle (rad) - Front")
-    plot_comparison(alpha_r_results, labels, "Rear Slip Angle Comparison", "Time Step", "Slip Angle (rad) - Rear")
+    # plot_comparison(r_results, labels, "Yaw Rate Comparison", "Time Step", "Yaw Rate (rad/s)")
+    plot_comparison(alpha_front_results, labels, "Front Slip Angle Comparison", "Time Step", "Slip Angle (rad) - Front")
+    plot_comparison(alpha_rear_results, labels, "Rear Slip Angle Comparison", "Time Step", "Slip Angle (rad) - Rear")
+    plot_comparison(steer_results, labels, "Steering Angle Comparison", "Time Step", "Steering Angle (rad)")
+    plot_comparison(beta_results, labels, "Side Slip Angle Comparison", "Time Step", "Side Slip Angle (rad)")
+    plot_comparison(ax_results, labels, "Longitudinal Acceleration Comparison", "Time Step", "Acceleration (m/s^2)")
+    plot_comparison(velocity_error_results, labels, "Velocity Error", "Time Step", "Velocity Error (m/s)")
+    plot_comparison(lateral_error_results, labels, "Lateral Error", "Time Step", "Lateral Error (m)")
+    plot_lateral_force(Fy_front_results, alpha_front_results, labels, "Front")
+    plot_lateral_force(Fy_rear_results, alpha_rear_results, labels, "Rear")
 
 if __name__ == "__main__":
     main()
