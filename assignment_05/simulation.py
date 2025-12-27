@@ -158,12 +158,13 @@ class Simulation:
         self.update_state(k1, scale=0.5)
         
         k2 = self.compute_dx(ax, delta)
-        self.update_state(k2, scale=0.5, revert=k1)
+        self.update_state(k2, scale=0.5, revert=k1, revert_scale=0.5)
         
         k3 = self.compute_dx(ax, delta)
-        self.update_state(k3, scale=1, revert=k2)
+        self.update_state(k3, scale=1, revert=k2, revert_scale=0.5)
 
         k4 = self.compute_dx(ax, delta)
+        self.update_state(np.zeros(6), scale=1, revert=k3, revert_scale=1)
         
         # Combine k1, k2, k3, k4 for RK4 update
         dx = (k1 + 2*k2 + 2*k3 + k4) / 6
@@ -178,15 +179,15 @@ class Simulation:
         elif self.model == "nonlinear":
             return self.nonlinear_single_track_model(ax, delta)
 
-    def update_state(self, dx, scale=1, revert=None):
+    def update_state(self, dx, scale=1, revert=None, revert_scale=1):
         """ Update state with scaled dx. Optionally revert previous state for RK4. """
         if revert is not None:
-            self.x -= revert[0] * self.dt
-            self.y -= revert[1] * self.dt
-            self.theta -= revert[2] * self.dt
-            self.vx -= revert[3] * self.dt
-            self.vy -= revert[4] * self.dt
-            self.r -= revert[5] * self.dt
+            self.x -= revert[0] * self.dt * revert_scale
+            self.y -= revert[1] * self.dt * revert_scale
+            self.theta -= revert[2] * self.dt * revert_scale
+            self.vx -= revert[3] * self.dt * revert_scale
+            self.vy -= revert[4] * self.dt * revert_scale
+            self.r -= revert[5] * self.dt * revert_scale
 
         self.x += dx[0] * self.dt * scale
         self.y += dx[1] * self.dt * scale
