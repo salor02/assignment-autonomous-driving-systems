@@ -19,6 +19,8 @@ class PIDController:
         self.previous_error = 0.0
         self.previous_output = 0.0
 
+        self.settling_time = 0.0
+
     def reset(self):
         """
         Reset the controller state.
@@ -48,17 +50,17 @@ class PIDController:
         self.integral += error * dt
         integral = self.ki * self.integral
         
-        # Anti-windup: Adjust the integral term if it would lead to saturation
-        # TO-DO: Complete, 
+        # Anti-windup
+        # The adopted strategies are clamping and back-calculation
         lower_limit, upper_limit = self.output_limits
         raw_output = proportional + integral  # Compute without derivative
         if lower_limit is not None and raw_output < lower_limit:
             anti_windup_correction = (raw_output - lower_limit) / self.ki
-            self.integral -= 0#TO-DO: Complete as in PID - Antiwindup slide
+            self.integral -= self.anti_windup_gain * anti_windup_correction
             integral = self.ki * self.integral
         elif upper_limit is not None and raw_output > upper_limit:
             anti_windup_correction = (raw_output - upper_limit) / self.ki
-            self.integral -= 0#TO-DO: Complete as in PID - Antiwindup slide
+            self.integral -= self.anti_windup_gain * anti_windup_correction
             integral = self.ki * self.integral
 
         # Derivative term

@@ -9,17 +9,16 @@ from mpc import *
 import cubic_spline_planner
 import math
 import matplotlib
-matplotlib.use('TkAgg')  # Or 'Agg', 'Qt5Agg', etc.
 
 # Simulation parameters
 dt = 0.05         # Time step (s)
 ax = 0.0            # Constant longitudinal acceleration (m/s^2)
 steer = 0.0      # Constant steering angle (rad)
-sim_time = 120.0      # Simulation duration in seconds
-steps = int(sim_time / dt)  # Simulation steps (30 seconds)
+sim_time = 30    # Simulation duration in seconds
+steps = int(sim_time / dt)  # Simulation steps
 
 # Control references
-target_speed = 20.0
+target_speed = 25.0
 
 # Vehicle parameters
 lf = 1.156          # Distance from COG to front axle (m)
@@ -30,7 +29,7 @@ Iz = 1792           # Yaw moment of inertia (kg*m^2)
 max_steer = 3.14  # Maximum steering angle in radians
 
 # Create instance of PID for Longitudinal Control
-long_control_pid = pid.PIDController(kp=0.001, ki=0.001, kd=0.001, output_limits=(-2, 2))
+long_control_pid = pid.PIDController(kp=1.6, ki=0.85, kd=0.01, output_limits=(-2, 2))
 
 # Create instance of PurePursuit, Stanley and MPC for Lateral Control
 k_pp = 0.001  # Speed proportional gain for Pure Pursuit
@@ -61,11 +60,15 @@ def point_transform(trg, pose, yaw):
 
     return local_trg
 
-def plot_comparison(results, labels, title, xlabel, ylabel):
+def plot_comparison(results, labels, title, xlabel, ylabel, settling_timestep = None):
     """ Plot comparison of results for a specific state variable. """
     plt.figure(figsize=(10, 6))
     for i, result in enumerate(results):
         plt.plot(result, label=labels[i])
+
+    if settling_timestep is not None:
+        plt.axvline(x=settling_timestep, color='r', linestyle='--', label=f'Settling Time: {settling_timestep*dt:.2f} ms')
+
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
@@ -136,69 +139,83 @@ def run_simulation(ax, steer, dt, integrator, model, steps=500):
 
     casadi_model()
 
+    # Settling time variables
+    settling_treshold = target_speed * 0.02
+    settling_timestep = 0
+    settled = False
+
     for step in range(steps):
     
         # Print time
         print("Time:", step*dt)
 
-        # Calculate ax to track speed
-        ax, velocity_error = long_control_pid.compute(target_speed, sim.vx, dt) # Exercise 1
-        # steer = 0 # Exercise 1 only
+        # Calculate ax to track speed (Exercise 1)
+        ax, velocity_error = long_control_pid.compute(target_speed, sim.vx, dt)
+        steer = 0 # Exercise 1 only
 
-        # Update actual frenet-frame position in the spline
-        # aka longitudinal position and actual lateral error
-        actual_position = sim.x, sim.y
-        actual_pose = sim.x, sim.y, sim.theta
-        path_spline.update_current_s(actual_position)
+        # This mechanism allows to keep track of the settling time
+        if not settled:
+            if abs(velocity_error) <= settling_treshold:
+                settling_timestep = step
+                settled = True
+        else:
+            if abs(velocity_error) > settling_treshold:
+                settled = False
 
-        # get actual position projected on the path/spline
-        position_projected = path_spline.calc_position(path_spline.cur_s)
-        prj = [ position_projected[0], position_projected[1] ]
-        local_error = point_transform(prj, actual_position, sim.theta)
+        # # Update actual frenet-frame position in the spline
+        # # aka longitudinal position and actual lateral error
+        # actual_position = sim.x, sim.y
+        # actual_pose = sim.x, sim.y, sim.theta
+        # path_spline.update_current_s(actual_position)
 
-        if(abs(local_error[1]) > 1.0):
-            print("Lateral error is higher than 1.0... ending the simulation")
-            print("Lateral error: ", local_error[1])
-            break
+        # # get actual position projected on the path/spline
+        # position_projected = path_spline.calc_position(path_spline.cur_s)
+        # prj = [ position_projected[0], position_projected[1] ]
+        # local_error = point_transform(prj, actual_position, sim.theta)
 
-        # get target pose
-        Lf = k_pp * sim.vx + look_ahead
-        s_pos = path_spline.cur_s + Lf
+        # if(abs(local_error[1]) > 1.0):
+        #     print("Lateral error is higher than 1.0... ending the simulation")
+        #     print("Lateral error: ", local_error[1])
+        #     break
 
-        trg = path_spline.calc_position(s_pos)
-        trg = [ trg[0], trg[1] ]
-        pp_position = actual_position
-        # Adjust CoG position to the rear axle position for PP
-        pp_position = actual_position[0] + lr * math.cos(sim.theta), actual_position[1] + lr * math.sin(sim.theta)
-        loc_trg = point_transform(trg, pp_position, sim.theta)
+        # # get target pose
+        # Lf = k_pp * sim.vx + look_ahead
+        # s_pos = path_spline.cur_s + Lf
 
-        # Calculate steer to track path
+        # trg = path_spline.calc_position(s_pos)
+        # trg = [ trg[0], trg[1] ]
+        # pp_position = actual_position
+        # # Adjust CoG position to the rear axle position for PP
+        # pp_position = actual_position[0] + lr * math.cos(sim.theta), actual_position[1] + lr * math.sin(sim.theta)
+        # loc_trg = point_transform(trg, pp_position, sim.theta)
+
+        # # Calculate steer to track path
         
-        ####### Pure Pursuit # Comment for Exercise 1
-        # Compute the look-ahead distance
-        # steer = pp_controller.compute_steering_angle(loc_trg, sim.theta, Lf)
+        # ####### Pure Pursuit # Comment for Exercise 1
+        # # Compute the look-ahead distance
+        # # steer = pp_controller.compute_steering_angle(loc_trg, sim.theta, Lf)
         
-        ###### Stanley # Comment for Exercise 1
-        # Adjust CoG position to the front axle position
-        px_front = position_projected[0] + lf * math.cos(sim.theta)
-        py_front = position_projected[1] + lf * math.sin(sim.theta)
-        stanley_target = px_front, py_front, path_spline.calc_yaw(path_spline.cur_s)
-        # steer = stanley_controller.compute_steering_angle(actual_pose, stanley_target, sim.vx)
+        # ###### Stanley # Comment for Exercise 1
+        # # Adjust CoG position to the front axle position
+        # px_front = position_projected[0] + lf * math.cos(sim.theta)
+        # py_front = position_projected[1] + lf * math.sin(sim.theta)
+        # stanley_target = px_front, py_front, path_spline.calc_yaw(path_spline.cur_s)
+        # # steer = stanley_controller.compute_steering_angle(actual_pose, stanley_target, sim.vx)
 
-        ###### MPC
+        # ###### MPC
 
-        # get future horizon targets pose
-        targets = [ ]
-        s_pos = path_spline.cur_s
-        for i in range(N):
-            step_increment = (sim.vx)*dt
-            trg = path_spline.calc_position(s_pos)
-            t_yaw = path_spline.calc_yaw(s_pos)
-            trg = [ trg[0], trg[1], t_yaw ]
-            targets.append(trg)
-            s_pos += step_increment
+        # # get future horizon targets pose
+        # targets = [ ]
+        # s_pos = path_spline.cur_s
+        # for i in range(N):
+        #     step_increment = (sim.vx)*dt
+        #     trg = path_spline.calc_position(s_pos)
+        #     t_yaw = path_spline.calc_yaw(s_pos)
+        #     trg = [ trg[0], trg[1], t_yaw ]
+        #     targets.append(trg)
+        #     s_pos += step_increment
 
-        steer = opt_step(targets, sim)
+        # steer = opt_step(targets, sim)
 
         # Make one step simulation via model integration
         sim.integrate(ax, float(steer))
@@ -222,9 +239,9 @@ def run_simulation(ax, steer, dt, integrator, model, steps=500):
 
         # Errors
         results["velocity_error"].append(velocity_error)
-        results["lateral_error"].append(local_error)
+        # results["lateral_error"].append(local_error)
 
-    return results
+    return results, settling_timestep
 
 def main():
 
@@ -237,12 +254,13 @@ def main():
     all_results = []
     actual_state = []
     labels = []
+    settling_timestep = []
 
     # Each results is an array of subsequent states of a variable, for example in result[0] there will be the array corresponding
     # to the X coord. Then, in all_results will be a matrix of arrays: one line for each simulation and one cell for each subsequent values
     # of a state in that simulation.
     for integrator, model in configs:
-        results = run_simulation(ax, steer, dt, integrator, model, steps)
+        results, settling_timestep = run_simulation(ax, steer, dt, integrator, model, steps)
         all_results.append(results)
         labels.append(f"{integrator.capitalize()} - {model.capitalize()}")
 
@@ -266,15 +284,15 @@ def main():
     # Plot comparisons for each simulation value
     plot_trajectory(x_results, y_results, labels, path_spline)
     # plot_comparison(theta_results, labels, "Heading Angle Comparison", "Time Step", "Heading Angle (rad)")
-    plot_comparison(vx_results, labels, "Longitudinal Velocity Comparison", "Time Step", "Velocity (m/s)")
+    plot_comparison(vx_results, labels, "Longitudinal Velocity Comparison", "Time Step", "Velocity (m/s)", settling_timestep)
     plot_comparison(vy_results, labels, "Lateral Velocity Comparison", "Time Step", "Lateral Velocity (m/s)")
     # plot_comparison(r_results, labels, "Yaw Rate Comparison", "Time Step", "Yaw Rate (rad/s)")
     plot_comparison(alpha_front_results, labels, "Front Slip Angle Comparison", "Time Step", "Slip Angle (rad) - Front")
     plot_comparison(alpha_rear_results, labels, "Rear Slip Angle Comparison", "Time Step", "Slip Angle (rad) - Rear")
     plot_comparison(steer_results, labels, "Steering Angle Comparison", "Time Step", "Steering Angle (rad)")
     plot_comparison(beta_results, labels, "Side Slip Angle Comparison", "Time Step", "Side Slip Angle (rad)")
-    plot_comparison(ax_results, labels, "Longitudinal Acceleration Comparison", "Time Step", "Acceleration (m/s^2)")
-    plot_comparison(velocity_error_results, labels, "Velocity Error", "Time Step", "Velocity Error (m/s)")
+    plot_comparison(ax_results, labels, "Longitudinal Acceleration Comparison", "Time Step", "Acceleration (m/s^2)", settling_timestep)
+    plot_comparison(velocity_error_results, labels, "Velocity Error", "Time Step", "Velocity Error (m/s)", settling_timestep)
     plot_comparison(lateral_error_results, labels, "Lateral Error", "Time Step", "Lateral Error (m)")
     plot_lateral_force(Fy_front_results, alpha_front_results, labels, "Front")
     plot_lateral_force(Fy_rear_results, alpha_rear_results, labels, "Rear")

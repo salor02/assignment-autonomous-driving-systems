@@ -25,7 +25,7 @@ class Simulation:
         self.x = 0                      # X position (m)
         self.y = 0                      # Y position (m)
         self.theta = 0                  # Heading angle (rad)
-        self.vx = 24.0                  # Longitudinal velocity (m/s)
+        self.vx = 0                     # Longitudinal velocity (m/s)
         self.vy = 0                     # Lateral velocity (m/s)
         self.r = 0                      # Yaw rate (rad/s)
 
@@ -118,7 +118,8 @@ class Simulation:
         Fz_rear_nominal = (self.l_f / self.l_wb) * F_n
 
         # Side slip angle
-        self.beta = np.arctan(self.vy / self.vx)
+        # Please note: in order to make the model works for small velocities too, a minimum value of 0.5 has been set for the denominator
+        self.beta = np.arctan(self.vy / max(0.5,self.vx))
 
         # Front and rear lateral forces computed based on the tire slip angles
         # This is the non-linear part, used to represent lateral forces beyond the "small slip angle" region
