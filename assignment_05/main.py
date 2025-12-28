@@ -14,11 +14,11 @@ import matplotlib
 dt = 0.05         # Time step (s)
 ax = 0.0            # Constant longitudinal acceleration (m/s^2)
 steer = 0.0      # Constant steering angle (rad)
-sim_time = 30    # Simulation duration in seconds
+sim_time = 170    # Simulation duration in seconds
 steps = int(sim_time / dt)  # Simulation steps
 
 # Control references
-target_speed = 25.0
+target_speed = 10.0
 
 # Vehicle parameters
 lf = 1.156          # Distance from COG to front axle (m)
@@ -32,8 +32,8 @@ max_steer = 3.14  # Maximum steering angle in radians
 long_control_pid = pid.PIDController(kp=1.6, ki=0.85, kd=0.01, output_limits=(-2, 2))
 
 # Create instance of PurePursuit, Stanley and MPC for Lateral Control
-k_pp = 0.001  # Speed proportional gain for Pure Pursuit
-look_ahead = 1.0  # Minimum look-ahead distance for Pure Pursuit
+k_pp = 0.1  # Speed proportional gain for Pure Pursuit
+look_ahead = 2.0  # Minimum look-ahead distance for Pure Pursuit
 k_stanley = 0.001  # Gain for cross-track error for Stanley
 pp_controller = purepursuit.PurePursuitController(wheelbase, max_steer)
 stanley_controller = stanley.StanleyController(k_stanley, lf, max_steer)
@@ -140,7 +140,7 @@ def run_simulation(ax, steer, dt, integrator, model, steps=500):
     casadi_model()
 
     # Settling time variables
-    settling_treshold = target_speed * 0.02
+    settling_treshold = target_speed * 0.05
     settling_timestep = 0
     settled = False
 
@@ -151,7 +151,7 @@ def run_simulation(ax, steer, dt, integrator, model, steps=500):
 
         # Calculate ax to track speed (Exercise 1)
         ax, velocity_error = long_control_pid.compute(target_speed, sim.vx, dt)
-        steer = 0 # Exercise 1 only
+        # steer = 0 # Exercise 1 only
 
         # This mechanism allows to keep track of the settling time
         if not settled:
@@ -162,45 +162,51 @@ def run_simulation(ax, steer, dt, integrator, model, steps=500):
             if abs(velocity_error) > settling_treshold:
                 settled = False
 
-        # # Update actual frenet-frame position in the spline
-        # # aka longitudinal position and actual lateral error
-        # actual_position = sim.x, sim.y
-        # actual_pose = sim.x, sim.y, sim.theta
-        # path_spline.update_current_s(actual_position)
+        # Update actual frenet-frame position in the spline
+        # aka longitudinal position and actual lateral error
+        actual_position = sim.x, sim.y
+        actual_pose = sim.x, sim.y, sim.theta
 
-        # # get actual position projected on the path/spline
-        # position_projected = path_spline.calc_position(path_spline.cur_s)
-        # prj = [ position_projected[0], position_projected[1] ]
-        # local_error = point_transform(prj, actual_position, sim.theta)
+        # Retrieve the current longitudinal position on the path (in Frenet-Frame coords)
+        path_spline.update_current_s(actual_position)
 
-        # if(abs(local_error[1]) > 1.0):
-        #     print("Lateral error is higher than 1.0... ending the simulation")
-        #     print("Lateral error: ", local_error[1])
-        #     break
+        # Get current position projected on the path/spline (in global coords <x,y>)
+        position_projected = path_spline.calc_position(path_spline.cur_s)
+        prj = [ position_projected[0], position_projected[1] ]
 
-        # # get target pose
-        # Lf = k_pp * sim.vx + look_ahead
-        # s_pos = path_spline.cur_s + Lf
+        # Compute the distance between the actual position and the projection point in order to get the lateral error (Y coord)
+        local_error = point_transform(prj, actual_position, sim.theta)
 
-        # trg = path_spline.calc_position(s_pos)
-        # trg = [ trg[0], trg[1] ]
-        # pp_position = actual_position
-        # # Adjust CoG position to the rear axle position for PP
-        # pp_position = actual_position[0] + lr * math.cos(sim.theta), actual_position[1] + lr * math.sin(sim.theta)
-        # loc_trg = point_transform(trg, pp_position, sim.theta)
+        if(abs(local_error[1]) > 1.0):
+            print("Lateral error is higher than 1.0... ending the simulation")
+            print("Lateral error: ", local_error[1])
+            break
+
+        # The following lines compute the target position in global coords, based on the lookahead distance
+        # Compute the lookahead distance, depending on the current velocity (the look_ahead variable is the minimum value of Lf)
+        Lf = k_pp * sim.vx + look_ahead
+        # Add calculated distance to the current longitufinal position
+        s_pos = path_spline.cur_s + Lf
+        # Get global target coords <x,y>
+        trg = path_spline.calc_position(s_pos)
+
+        # Adjust CoG position to the rear axle position for PP
+        pp_position = actual_position[0] + lr * math.cos(sim.theta), actual_position[1] + lr * math.sin(sim.theta)
+
+        # Compute distance between vehicle rear axle and lookahead point, both expressed in global coords
+        target_pos_local = point_transform([trg[0], trg[1]], pp_position, sim.theta)
 
         # # Calculate steer to track path
         
         # ####### Pure Pursuit # Comment for Exercise 1
-        # # Compute the look-ahead distance
-        # # steer = pp_controller.compute_steering_angle(loc_trg, sim.theta, Lf)
-        
+        # steer = pp_controller.compute_steering_angle(target_pos_local, sim.theta, Lf)
+
         # ###### Stanley # Comment for Exercise 1
         # # Adjust CoG position to the front axle position
-        # px_front = position_projected[0] + lf * math.cos(sim.theta)
-        # py_front = position_projected[1] + lf * math.sin(sim.theta)
-        # stanley_target = px_front, py_front, path_spline.calc_yaw(path_spline.cur_s)
-        # # steer = stanley_controller.compute_steering_angle(actual_pose, stanley_target, sim.vx)
+        px_front = position_projected[0] + lf * math.cos(sim.theta)
+        py_front = position_projected[1] + lf * math.sin(sim.theta)
+        stanley_target = px_front, py_front, path_spline.calc_yaw(path_spline.cur_s)
+        steer = stanley_controller.compute_steering_angle(actual_pose, stanley_target, sim.vx)
 
         # ###### MPC
 
@@ -239,7 +245,7 @@ def run_simulation(ax, steer, dt, integrator, model, steps=500):
 
         # Errors
         results["velocity_error"].append(velocity_error)
-        # results["lateral_error"].append(local_error)
+        results["lateral_error"].append(local_error[1])
 
     return results, settling_timestep
 
@@ -291,7 +297,7 @@ def main():
     plot_comparison(alpha_rear_results, labels, "Rear Slip Angle Comparison", "Time Step", "Slip Angle (rad) - Rear")
     plot_comparison(steer_results, labels, "Steering Angle Comparison", "Time Step", "Steering Angle (rad)")
     plot_comparison(beta_results, labels, "Side Slip Angle Comparison", "Time Step", "Side Slip Angle (rad)")
-    plot_comparison(ax_results, labels, "Longitudinal Acceleration Comparison", "Time Step", "Acceleration (m/s^2)", settling_timestep)
+    plot_comparison(ax_results, labels, "Longitudinal Acceleration Comparison", "Time Step", "Acceleration (m/s^2)")
     plot_comparison(velocity_error_results, labels, "Velocity Error", "Time Step", "Velocity Error (m/s)", settling_timestep)
     plot_comparison(lateral_error_results, labels, "Lateral Error", "Time Step", "Lateral Error (m)")
     plot_lateral_force(Fy_front_results, alpha_front_results, labels, "Front")
