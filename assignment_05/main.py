@@ -18,7 +18,7 @@ sim_time = 170    # Simulation duration in seconds
 steps = int(sim_time / dt)  # Simulation steps
 
 # Control references
-target_speed =26.2
+target_speed =23
 
 # Vehicle parameters
 lf = 1.156          # Distance from COG to front axle (m)
@@ -181,29 +181,29 @@ def run_simulation(ax, steer, dt, integrator, model, steps=500):
 
         ### PURE PURSUIT
 
-        # # The following lines compute the target position in global coords, based on the lookahead distance
-        # Lf = k_pp * sim.vx + look_ahead # compute the lookahead distance, depending on the current velocity (the look_ahead variable is the minimum value of Lf)
-        # s_pos = path_spline.cur_s + Lf # add calculated distance to the current longitudinal position
-        # trg = path_spline.calc_position(s_pos) # get global target coords <x,y>
+        # The following lines compute the target position in global coords, based on the lookahead distance
+        Lf = k_pp * sim.vx + look_ahead # compute the lookahead distance, depending on the current velocity (the look_ahead variable is the minimum value of Lf)
+        s_pos = path_spline.cur_s + Lf # add calculated distance to the current longitudinal position
+        trg = path_spline.calc_position(s_pos) # get global target coords <x,y>
 
-        # # Adjust CoG position to the rear axle position for PP
-        # pp_position = actual_position[0] + lr * math.cos(sim.theta), actual_position[1] + lr * math.sin(sim.theta)
+        # Adjust CoG position to the rear axle position for PP
+        pp_position = actual_position[0] + lr * math.cos(sim.theta), actual_position[1] + lr * math.sin(sim.theta)
 
-        # # Compute distance between vehicle rear axle and lookahead point, both expressed in global coords
-        # target_pos_local = point_transform([trg[0], trg[1]], pp_position, sim.theta)
+        # Compute distance between vehicle rear axle and lookahead point, both expressed in global coords
+        target_pos_local = point_transform([trg[0], trg[1]], pp_position, sim.theta)
 
-        # # Calculate steer to track path
-        # steer = pp_controller.compute_steering_angle(target_pos_local, sim.theta, Lf)
+        # Calculate steer to track path
+        steer = pp_controller.compute_steering_angle(target_pos_local, sim.theta, Lf)
 
-        ### STANLEY
+        # ### STANLEY
 
-        # Adjust CoG position to the front axle position (convention for Stanley)
-        px_front = position_projected[0] + lf * math.cos(sim.theta)
-        py_front = position_projected[1] + lf * math.sin(sim.theta)
-        stanley_target = px_front, py_front, path_spline.calc_yaw(path_spline.cur_s)
+        # # Adjust CoG position to the front axle position (convention for Stanley)
+        # px_front = position_projected[0] + lf * math.cos(sim.theta)
+        # py_front = position_projected[1] + lf * math.sin(sim.theta)
+        # stanley_target = px_front, py_front, path_spline.calc_yaw(path_spline.cur_s)
         
-        actual_pose = sim.x, sim.y, sim.theta
-        steer = stanley_controller.compute_steering_angle(actual_pose, stanley_target, sim.vx)
+        # actual_pose = sim.x, sim.y, sim.theta
+        # steer = stanley_controller.compute_steering_angle(actual_pose, stanley_target, sim.vx)
 
         ### MPC
 
