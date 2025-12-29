@@ -37,7 +37,7 @@ class StanleyController:
 
         # Compute heading error (yaw difference)
         heading_error = target_yaw - current_yaw
-        heading_error = math.atan2(math.sin(heading_error), math.cos(heading_error))
+        heading_error = math.atan2(math.sin(heading_error), math.cos(heading_error)) # Normalize the distance between -pi and +pi rad
 
         # Compute cross-track error
         dx = front_x - target_x
@@ -49,10 +49,7 @@ class StanleyController:
         cross_track_correction = math.atan2(self.k * cross_track_error, effective_speed)
 
         # Total steering angle
-        # TO-DO: Adjust the gains in order to improve the controller's tracking
-        # right now they are both 1.0
-        delta = 1.0 * heading_error + 1.0 * cross_track_correction
-
+        delta = 1.4 * heading_error + 4.5 * cross_track_correction
 
         # Saturate the steering angle within the maximum limits
         delta = max(-self.max_steer, min(delta, self.max_steer))

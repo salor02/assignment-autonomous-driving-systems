@@ -18,7 +18,7 @@ sim_time = 170    # Simulation duration in seconds
 steps = int(sim_time / dt)  # Simulation steps
 
 # Control references
-target_speed = 10.0
+target_speed =20.0
 
 # Vehicle parameters
 lf = 1.156          # Distance from COG to front axle (m)
@@ -34,7 +34,7 @@ long_control_pid = pid.PIDController(kp=1.6, ki=0.85, kd=0.01, output_limits=(-2
 # Create instance of PurePursuit, Stanley and MPC for Lateral Control
 k_pp = 0.1  # Speed proportional gain for Pure Pursuit
 look_ahead = 2.0  # Minimum look-ahead distance for Pure Pursuit
-k_stanley = 0.001  # Gain for cross-track error for Stanley
+k_stanley = 1.7  # Gain for cross-track error for Stanley
 pp_controller = purepursuit.PurePursuitController(wheelbase, max_steer)
 stanley_controller = stanley.StanleyController(k_stanley, lf, max_steer)
 
@@ -162,33 +162,29 @@ def run_simulation(ax, steer, dt, integrator, model, steps=500):
             if abs(velocity_error) > settling_treshold:
                 settled = False
 
-        # Update actual frenet-frame position in the spline
-        # aka longitudinal position and actual lateral error
-        actual_position = sim.x, sim.y
-        actual_pose = sim.x, sim.y, sim.theta
+        # The following lines compute the projection of the current vehicle position on the path. Keep in mind that
+        # the vehicle has a global position <x,y>. By the following code we are looking for the position of the vehicle position_projected
+        # on the path. "If the vehicle was following the path perfectly, where would it be now?"
+        actual_position = sim.x, sim.y # actual position of the vehicle in global coords
+        path_spline.update_current_s(actual_position) # update the cur_s longitudinal coord in the spline (frenet-frame)
+        position_projected = path_spline.calc_position(path_spline.cur_s) # get the projection of the vehicle on the spline (in global coords)
+        prj = [ position_projected[0], position_projected[1] ] # this is the point where the vehicle would be on the path in the ideal case
 
-        # Retrieve the current longitudinal position on the path (in Frenet-Frame coords)
-        path_spline.update_current_s(actual_position)
-
-        # Get current position projected on the path/spline (in global coords <x,y>)
-        position_projected = path_spline.calc_position(path_spline.cur_s)
-        prj = [ position_projected[0], position_projected[1] ]
-
+        ### LATERAL ERROR CHECK
         # Compute the distance between the actual position and the projection point in order to get the lateral error (Y coord)
         local_error = point_transform(prj, actual_position, sim.theta)
 
-        if(abs(local_error[1]) > 1.0):
-            print("Lateral error is higher than 1.0... ending the simulation")
-            print("Lateral error: ", local_error[1])
-            break
+        # if(abs(local_error[1]) > 1.0):
+        #     print("Lateral error is higher than 1.0... ending the simulation")
+        #     print("Lateral error: ", local_error[1])
+        #     break
+
+        ### PURE PURSUIT
 
         # The following lines compute the target position in global coords, based on the lookahead distance
-        # Compute the lookahead distance, depending on the current velocity (the look_ahead variable is the minimum value of Lf)
-        Lf = k_pp * sim.vx + look_ahead
-        # Add calculated distance to the current longitufinal position
-        s_pos = path_spline.cur_s + Lf
-        # Get global target coords <x,y>
-        trg = path_spline.calc_position(s_pos)
+        Lf = k_pp * sim.vx + look_ahead # compute the lookahead distance, depending on the current velocity (the look_ahead variable is the minimum value of Lf)
+        s_pos = path_spline.cur_s + Lf # add calculated distance to the current longitudinal position
+        trg = path_spline.calc_position(s_pos) # get global target coords <x,y>
 
         # Adjust CoG position to the rear axle position for PP
         pp_position = actual_position[0] + lr * math.cos(sim.theta), actual_position[1] + lr * math.sin(sim.theta)
@@ -196,19 +192,20 @@ def run_simulation(ax, steer, dt, integrator, model, steps=500):
         # Compute distance between vehicle rear axle and lookahead point, both expressed in global coords
         target_pos_local = point_transform([trg[0], trg[1]], pp_position, sim.theta)
 
-        # # Calculate steer to track path
-        
-        # ####### Pure Pursuit # Comment for Exercise 1
-        # steer = pp_controller.compute_steering_angle(target_pos_local, sim.theta, Lf)
+        # Calculate steer to track path
+        steer = pp_controller.compute_steering_angle(target_pos_local, sim.theta, Lf)
 
-        # ###### Stanley # Comment for Exercise 1
-        # # Adjust CoG position to the front axle position
+        ### STANLEY
+
+        # Adjust CoG position to the front axle position (convention for Stanley)
         px_front = position_projected[0] + lf * math.cos(sim.theta)
         py_front = position_projected[1] + lf * math.sin(sim.theta)
         stanley_target = px_front, py_front, path_spline.calc_yaw(path_spline.cur_s)
+        
+        actual_pose = sim.x, sim.y, sim.theta
         steer = stanley_controller.compute_steering_angle(actual_pose, stanley_target, sim.vx)
 
-        # ###### MPC
+        ### MPC
 
         # # get future horizon targets pose
         # targets = [ ]
