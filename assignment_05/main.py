@@ -18,7 +18,7 @@ sim_time = 170    # Simulation duration in seconds
 steps = int(sim_time / dt)  # Simulation steps
 
 # Control references
-target_speed =20.0
+target_speed =26.2
 
 # Vehicle parameters
 lf = 1.156          # Distance from COG to front axle (m)
@@ -34,7 +34,7 @@ long_control_pid = pid.PIDController(kp=1.6, ki=0.85, kd=0.01, output_limits=(-2
 # Create instance of PurePursuit, Stanley and MPC for Lateral Control
 k_pp = 0.1  # Speed proportional gain for Pure Pursuit
 look_ahead = 2.0  # Minimum look-ahead distance for Pure Pursuit
-k_stanley = 1.7  # Gain for cross-track error for Stanley
+k_stanley = 1.9  # Gain for cross-track error for Stanley
 pp_controller = purepursuit.PurePursuitController(wheelbase, max_steer)
 stanley_controller = stanley.StanleyController(k_stanley, lf, max_steer)
 
@@ -174,26 +174,26 @@ def run_simulation(ax, steer, dt, integrator, model, steps=500):
         # Compute the distance between the actual position and the projection point in order to get the lateral error (Y coord)
         local_error = point_transform(prj, actual_position, sim.theta)
 
-        # if(abs(local_error[1]) > 1.0):
-        #     print("Lateral error is higher than 1.0... ending the simulation")
-        #     print("Lateral error: ", local_error[1])
-        #     break
+        if(abs(local_error[1]) > 1.0):
+            print("Lateral error is higher than 1.0... ending the simulation")
+            print("Lateral error: ", local_error[1])
+            break
 
         ### PURE PURSUIT
 
-        # The following lines compute the target position in global coords, based on the lookahead distance
-        Lf = k_pp * sim.vx + look_ahead # compute the lookahead distance, depending on the current velocity (the look_ahead variable is the minimum value of Lf)
-        s_pos = path_spline.cur_s + Lf # add calculated distance to the current longitudinal position
-        trg = path_spline.calc_position(s_pos) # get global target coords <x,y>
+        # # The following lines compute the target position in global coords, based on the lookahead distance
+        # Lf = k_pp * sim.vx + look_ahead # compute the lookahead distance, depending on the current velocity (the look_ahead variable is the minimum value of Lf)
+        # s_pos = path_spline.cur_s + Lf # add calculated distance to the current longitudinal position
+        # trg = path_spline.calc_position(s_pos) # get global target coords <x,y>
 
-        # Adjust CoG position to the rear axle position for PP
-        pp_position = actual_position[0] + lr * math.cos(sim.theta), actual_position[1] + lr * math.sin(sim.theta)
+        # # Adjust CoG position to the rear axle position for PP
+        # pp_position = actual_position[0] + lr * math.cos(sim.theta), actual_position[1] + lr * math.sin(sim.theta)
 
-        # Compute distance between vehicle rear axle and lookahead point, both expressed in global coords
-        target_pos_local = point_transform([trg[0], trg[1]], pp_position, sim.theta)
+        # # Compute distance between vehicle rear axle and lookahead point, both expressed in global coords
+        # target_pos_local = point_transform([trg[0], trg[1]], pp_position, sim.theta)
 
-        # Calculate steer to track path
-        steer = pp_controller.compute_steering_angle(target_pos_local, sim.theta, Lf)
+        # # Calculate steer to track path
+        # steer = pp_controller.compute_steering_angle(target_pos_local, sim.theta, Lf)
 
         ### STANLEY
 

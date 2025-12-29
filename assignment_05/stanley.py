@@ -49,7 +49,7 @@ class StanleyController:
         cross_track_correction = math.atan2(self.k * cross_track_error, effective_speed)
 
         # Total steering angle
-        delta = 1.4 * heading_error + 4.5 * cross_track_correction
+        delta = 1.9 * heading_error + 9.5 * cross_track_correction
 
         # Saturate the steering angle within the maximum limits
         delta = max(-self.max_steer, min(delta, self.max_steer))
