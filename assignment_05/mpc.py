@@ -10,6 +10,16 @@ N = int(T/dt) # Horizon total points
 max_steer = 3.14  # Maximum steering angle in radians
 min_steer = -3.14  # Minimum steering angle in radians
 
+x_error_gain = 50 # weight on x error
+y_error_gain = 50 # weight on y error
+heading_error_gain = 500 # weight on heading error
+
+# weight for the final prediction step. The last step should weight more than the others
+# in order to allow a certain amount of error during the process but minimize the error at the final target position
+terminal_cost = 100 
+
+steering_cost = 10000 # this indicates the cost of steering, the higher the more we want to avoid to steer
+
 def casadi_model():
     global F
 
@@ -60,7 +70,8 @@ def opt_step(target, state):
 
     # Control for all segments
     nu = N #number of states
-    Us = MX.sym("U",nu) #steer control input
+    #steer control input (this vector contains the nu states representing the optimal input steer at each step) 
+    Us = MX.sym("U",nu) 
 
     # Initial conditions
     x0 = [state.x, state.y, state.theta, state.vx]
@@ -74,21 +85,24 @@ def opt_step(target, state):
     lbg = []
     ubg = []
 
-    # For every temporal step
+    # For every temporal step do the following:
+    # - integrate the step, by putting the steering value at step k (still unknown) in the defined model
+    # - update the cost function giving different weight to each state. A position distance
+    #   from target is not penalized as much as a heading error. By this settings we aim to achieve a smooth
+    #   drive
     for k in range(nu):
-        X = F(X, vertcat(Us[k])) #Integrate the step
+        X = F(X, vertcat(Us[k])) #integration step
         gain_mult = 1
         # give more importance to the last step using a bigger gain
         if(k == nu-1):
-            gain_mult=1 #You can use this multiplier as terminal cost
-        J += 100.0*gain_mult*(X[0]-target[k][0])**2 #x error cost 
-        J += 100.0*gain_mult*(X[1]-target[k][1])**2 #y error cost
-        J += 10.0*gain_mult*(X[2] - target[k][2])**2 #heading error cost
+            gain_mult=terminal_cost #You can use this multiplier as terminal cost
+        J += x_error_gain*gain_mult*(X[0]-target[k][0])**2 #x error cost 
+        J += y_error_gain*gain_mult*(X[1]-target[k][1])**2 #y error cost
+        J += heading_error_gain*gain_mult*(X[2] - target[k][2])**2 #heading error cost
     # G = X[index] #if you want to set a state to constrain in arg["lbg"] and arg["ubg"]. It can be ignored
 
-
     # Objective function and constraints
-    J += mtimes(Us.T,Us)*100000.0 #Consider to set this weight dependent on speed
+    J += mtimes(Us.T,Us)*steering_cost * X[3] #The more the speed the more the steering penalty
 
     # NLP
     nlp = {'x':vertcat(Us), 'f':J}

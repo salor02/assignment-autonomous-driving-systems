@@ -14,11 +14,11 @@ import matplotlib
 dt = 0.05         # Time step (s)
 ax = 0.0            # Constant longitudinal acceleration (m/s^2)
 steer = 0.0      # Constant steering angle (rad)
-sim_time = 170    # Simulation duration in seconds
+sim_time = 80    # Simulation duration in seconds
 steps = int(sim_time / dt)  # Simulation steps
 
 # Control references
-target_speed =23
+target_speed =29.5
 
 # Vehicle parameters
 lf = 1.156          # Distance from COG to front axle (m)
@@ -39,15 +39,27 @@ pp_controller = purepursuit.PurePursuitController(wheelbase, max_steer)
 stanley_controller = stanley.StanleyController(k_stanley, lf, max_steer)
 
 def load_path(file_path):
-    file = open(file_path, "r")
-    
     xs = []
     ys = []
-
-    while(file.readline()):
-        line = file.readline()
-        xs.append( float(line.split(",")[0]) )
-        ys.append( float(line.split(",")[1]) )
+    with open(file_path, "r") as f:
+        for i, line in enumerate(f, start=1):
+            line = line.strip()
+            if not line or line.startswith('#'):  # Salta righe vuote o commenti
+                continue
+                
+            parts = [p.strip() for p in line.split(',')]
+            if len(parts) != 2:
+                print(f"Riga {i} malformata: {repr(line)}")
+                continue
+                
+            try:
+                xs.append(float(parts[0]))
+                ys.append(float(parts[1]))
+            except ValueError as e:
+                print(f"Riga {i} non numerica: {parts} -> {e}")
+                continue
+                
+    print(f"Caricati {len(xs)} punti validi")
     return xs, ys
 
 # Load path and create a spline
@@ -59,6 +71,18 @@ def point_transform(trg, pose, yaw):
     local_trg = [trg[0] - pose[0], trg[1] - pose[1]]
 
     return local_trg
+
+def lateral_error_calc(trg, pose, yaw):
+    dx = trg[0] - pose[0]
+    dy = trg[1] - pose[1]
+
+    cos_y = math.cos(yaw)
+    sin_y = math.sin(yaw)
+
+    x_local =  cos_y * dx + sin_y * dy
+    y_local = -sin_y * dx + cos_y * dy
+
+    return [x_local, y_local]
 
 def plot_comparison(results, labels, title, xlabel, ylabel, settling_timestep = None):
     """ Plot comparison of results for a specific state variable. """
@@ -172,7 +196,7 @@ def run_simulation(ax, steer, dt, integrator, model, steps=500):
 
         ### LATERAL ERROR CHECK
         # Compute the distance between the actual position and the projection point in order to get the lateral error (Y coord)
-        local_error = point_transform(prj, actual_position, sim.theta)
+        local_error = lateral_error_calc(prj, actual_position, sim.theta)
 
         if(abs(local_error[1]) > 1.0):
             print("Lateral error is higher than 1.0... ending the simulation")
@@ -205,9 +229,9 @@ def run_simulation(ax, steer, dt, integrator, model, steps=500):
         # actual_pose = sim.x, sim.y, sim.theta
         # steer = stanley_controller.compute_steering_angle(actual_pose, stanley_target, sim.vx)
 
-        ### MPC
+        # ### MPC
 
-        # # get future horizon targets pose
+        # # The following lines compute the target point on the path for the future horizon
         # targets = [ ]
         # s_pos = path_spline.cur_s
         # for i in range(N):
