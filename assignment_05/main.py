@@ -14,11 +14,11 @@ import matplotlib
 dt = 0.05         # Time step (s)
 ax = 0.0            # Constant longitudinal acceleration (m/s^2)
 steer = 0.0      # Constant steering angle (rad)
-sim_time = 80    # Simulation duration in seconds
+sim_time = 110    # Simulation duration in seconds
 steps = int(sim_time / dt)  # Simulation steps
 
 # Control references
-target_speed =26.4
+target_speed =23
 
 # Vehicle parameters
 lf = 1.156          # Distance from COG to front axle (m)
@@ -135,7 +135,6 @@ def plot_lateral_force(Fy, alpha, labels, force_type):
     plt.grid(True)
     plt.savefig("./img/" + force_type + " Lateral Force vs Slip Angle.png", dpi=300, bbox_inches='tight')
 
-
 def run_simulation(ax, steer, dt, integrator, model, steps=500):
     """ Run a simulation with the given parameters and return all states. """
 
@@ -198,10 +197,10 @@ def run_simulation(ax, steer, dt, integrator, model, steps=500):
         # Compute the distance between the actual position and the projection point in order to get the lateral error (Y coord)
         local_error = lateral_error_calc(prj, actual_position, sim.theta)
 
-        if(abs(local_error[1]) > 1.0):
-            print("Lateral error is higher than 1.0... ending the simulation")
-            print("Lateral error: ", local_error[1])
-            break
+        # if(abs(local_error[1]) > 1.0):
+        #     print("Lateral error is higher than 1.0... ending the simulation")
+        #     print("Lateral error: ", local_error[1])
+        #     break
 
         # ### PURE PURSUIT
 
@@ -219,30 +218,30 @@ def run_simulation(ax, steer, dt, integrator, model, steps=500):
         # # Calculate steer to track path
         # steer = pp_controller.compute_steering_angle(target_pos_local, sim.theta, Lf)
 
-        ### STANLEY
+        # ### STANLEY
 
-        # Adjust CoG position to the front axle position (convention for Stanley)
-        px_front = position_projected[0] + lf * math.cos(sim.theta)
-        py_front = position_projected[1] + lf * math.sin(sim.theta)
-        stanley_target = px_front, py_front, path_spline.calc_yaw(path_spline.cur_s)
+        # # Adjust CoG position to the front axle position (convention for Stanley)
+        # px_front = position_projected[0] + lf * math.cos(sim.theta)
+        # py_front = position_projected[1] + lf * math.sin(sim.theta)
+        # stanley_target = px_front, py_front, path_spline.calc_yaw(path_spline.cur_s)
         
-        actual_pose = sim.x, sim.y, sim.theta
-        steer = stanley_controller.compute_steering_angle(actual_pose, stanley_target, sim.vx)
+        # actual_pose = sim.x, sim.y, sim.theta
+        # steer = stanley_controller.compute_steering_angle(actual_pose, stanley_target, sim.vx)
 
-        # ### MPC
+        ### MPC
 
-        # # The following lines compute the target point on the path for the future horizon
-        # targets = [ ]
-        # s_pos = path_spline.cur_s
-        # for i in range(N):
-        #     step_increment = (sim.vx)*dt
-        #     trg = path_spline.calc_position(s_pos)
-        #     t_yaw = path_spline.calc_yaw(s_pos)
-        #     trg = [ trg[0], trg[1], t_yaw ]
-        #     targets.append(trg)
-        #     s_pos += step_increment
+        # The following lines compute the target point on the path for the future horizon
+        targets = [ ]
+        s_pos = path_spline.cur_s
+        for i in range(N):
+            step_increment = (sim.vx)*dt
+            trg = path_spline.calc_position(s_pos)
+            t_yaw = path_spline.calc_yaw(s_pos)
+            trg = [ trg[0], trg[1], t_yaw ]
+            targets.append(trg)
+            s_pos += step_increment
 
-        # steer = opt_step(targets, sim)
+        steer = opt_step(targets, sim)
 
         # Make one step simulation via model integration
         sim.integrate(ax, float(steer))
@@ -310,13 +309,13 @@ def main():
 
     # Plot comparisons for each simulation value
     plot_trajectory(x_results, y_results, labels, path_spline)
-    # plot_comparison(theta_results, labels, "Heading Angle Comparison", "Time Step", "Heading Angle (rad)")
+    plot_comparison(theta_results, labels, "Heading Angle Comparison", "Time Step", "Heading Angle (rad)")
     plot_comparison(vx_results, labels, "Longitudinal Velocity Comparison", "Time Step", "Velocity (m/s)", settling_timestep)
     plot_comparison(vy_results, labels, "Lateral Velocity Comparison", "Time Step", "Lateral Velocity (m/s)")
-    # plot_comparison(r_results, labels, "Yaw Rate Comparison", "Time Step", "Yaw Rate (rad/s)")
+    plot_comparison(r_results, labels, "Yaw Rate Comparison", "Time Step", "Yaw Rate (rad/s)")
     plot_comparison(alpha_front_results, labels, "Front Slip Angle Comparison", "Time Step", "Slip Angle (rad) - Front")
     plot_comparison(alpha_rear_results, labels, "Rear Slip Angle Comparison", "Time Step", "Slip Angle (rad) - Rear")
-    plot_comparison(steer_results, labels, "Steering Angle Comparison", "Time Step", "Steering Angle (rad)")
+    # plot_comparison(steer_results, labels, "Steering Angle Comparison", "Time Step", "Steering Angle (rad)")
     plot_comparison(beta_results, labels, "Side Slip Angle Comparison", "Time Step", "Side Slip Angle (rad)")
     plot_comparison(ax_results, labels, "Longitudinal Acceleration Comparison", "Time Step", "Acceleration (m/s^2)")
     plot_comparison(velocity_error_results, labels, "Velocity Error", "Time Step", "Velocity Error (m/s)", settling_timestep)

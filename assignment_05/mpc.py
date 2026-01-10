@@ -3,22 +3,22 @@ from casadi import *
 from casadi.tools import *
 
 # MPC time
-T =  1.0 # Horizon length in seconds
+T =  1 # Horizon length in seconds
 dt = 0.05 # Horizon timesteps
 N = int(T/dt) # Horizon total points
 
 max_steer = 3.14  # Maximum steering angle in radians
 min_steer = -3.14  # Minimum steering angle in radians
 
-x_error_gain = 50 # weight on x error
-y_error_gain = 50 # weight on y error
-heading_error_gain = 500 # weight on heading error
+x_error_gain = 100 # weight on x error
+y_error_gain = 100 # weight on y error
+heading_error_gain = 3000 # weight on heading error
 
 # weight for the final prediction step. The last step should weight more than the others
 # in order to allow a certain amount of error during the process but minimize the error at the final target position
-terminal_cost = 100 
+terminal_cost = 500 
 
-steering_cost = 10000 # this indicates the cost of steering, the higher the more we want to avoid to steer
+steering_cost = 2000 # this indicates the cost of steering, the higher the more we want to avoid to steer
 
 def casadi_model():
     global F
@@ -33,22 +33,66 @@ def casadi_model():
     Lr = 1.42 
     Lf = 1.156
     L = Lf + Lr
+    mass = 1200
+    Iz = 1792
+
+    #### LINEAR SINGLE TRACK MODEL
+
+    # Pacejka's Magic Formula coefficients
+    B, C, D, E = 7.1433, 1.3507, 1.0489, -0.0074722
+    B_front, C_front, D_front, E_front = B, C, D, E
+    B_rear, C_rear, D_rear, E_rear = B, C, D, E
+
+    # Cornering stiffness front/rear (N/rad)
+    cornering_stiffness_front = B_front*C_front*D_front
+    cornering_stiffness_rear = B_rear*C_rear*D_rear  
 
     # State
-    x = MX.sym("x",4)
-    sx    = x[0]  # position x
-    sy    = x[1]  # position y
-    yaw   = x[2]  # yaw
-    speed = x[3]
+    x = MX.sym("x",6)
+    sx = x[0]   # X Position
+    sy = x[1]   # Y Position
+    yaw = x[2]  # Yaw Angle
+    vx = x[3]   # Longitudinal Velocity
+    vy = x[4]   # Lateral Velocity
+    r = x[5]    # Yaw Rate
 
-    # ODE right hand side
-    sxdot    = speed*cos(yaw)
-    sydot    = speed*sin(yaw)
-    yawdot   = (speed/L)*tan(steer)
-    speeddot = 0.0
+    # Per evitare divisioni per zero se vx è basso in simulazione:
+    v_safe = fmax(1.0, vx)
+    
+    # Slip Angles (Linear approximation for small angles)
+    alpha_f = steer - (vy + Lf*r)/v_safe
+    alpha_r = - (vy - Lr*r)/v_safe
+    
+    # Lateral Forces
+    FyF = (Lr / L) * mass * 9.81 * cornering_stiffness_front * alpha_f
+    FyR = (Lf / L) * mass * 9.81 * cornering_stiffness_rear * alpha_r
+
+    sxdot = v_safe * cos(yaw) - vy * sin(yaw)
+    sydot = v_safe * sin(yaw) + vy * cos(yaw)
+    yawdot = r
+    vxdot = 0.0 # Assumiamo velocità costante nell'orizzonte (gestita dal PID esterno)
+    vydot = (FyF * cos(steer) + FyR) / mass - v_safe * r
+    rdot  = (Lf * FyF * cos(steer) - Lr * FyR) / Iz
 
     # Concatenate vertically the expressions creating a row vector
-    xdot = vertcat(sxdot, sydot, yawdot, speeddot)
+    xdot = vertcat(sxdot, sydot, yawdot, vxdot, vydot, rdot)
+
+    # #### KINEMATIC MODEL
+    # # State
+    # x = MX.sym("x",4)
+    # sx    = x[0]  # position x
+    # sy    = x[1]  # position y
+    # yaw   = x[2]  # yaw
+    # speed = x[3]
+
+    # # ODE right hand side
+    # sxdot    = speed*cos(yaw)
+    # sydot    = speed*sin(yaw)
+    # yawdot   = (speed/L)*tan(steer)
+    # speeddot = 0.0
+
+    # # Concatenate vertically the expressions creating a row vector
+    # xdot = vertcat(sxdot, sydot, yawdot, speeddot)
 
     # ODE right hand side function
     # as input are used the state and control inputs,
@@ -74,7 +118,8 @@ def opt_step(target, state):
     Us = MX.sym("U",nu) 
 
     # Initial conditions
-    x0 = [state.x, state.y, state.theta, state.vx]
+    x0 = [state.x, state.y, state.theta, state.vx, state.vy, state.r] # linear single track
+    # x0 = [state.x, state.y, state.theta, state.vx] #kinematic
     X0 = MX(x0) # vector containing the initial state
 
     J = 0 # objective function that should be minimized by the nlp solver
