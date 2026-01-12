@@ -14,11 +14,11 @@ import matplotlib
 dt = 0.05         # Time step (s)
 ax = 0.0            # Constant longitudinal acceleration (m/s^2)
 steer = 0.0      # Constant steering angle (rad)
-sim_time = 110    # Simulation duration in seconds
+sim_time = 80    # Simulation duration in seconds
 steps = int(sim_time / dt)  # Simulation steps
 
 # Control references
-target_speed =23
+target_speed =29.6
 
 # Vehicle parameters
 lf = 1.156          # Distance from COG to front axle (m)

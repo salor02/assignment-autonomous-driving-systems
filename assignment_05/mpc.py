@@ -10,15 +10,15 @@ N = int(T/dt) # Horizon total points
 max_steer = 3.14  # Maximum steering angle in radians
 min_steer = -3.14  # Minimum steering angle in radians
 
-x_error_gain = 100 # weight on x error
-y_error_gain = 100 # weight on y error
-heading_error_gain = 3000 # weight on heading error
+x_error_gain = 50 # weight on x error
+y_error_gain = 50 # weight on y error
+heading_error_gain = 10 # weight on heading error
 
 # weight for the final prediction step. The last step should weight more than the others
 # in order to allow a certain amount of error during the process but minimize the error at the final target position
-terminal_cost = 500 
+terminal_cost = 50 
 
-steering_cost = 2000 # this indicates the cost of steering, the higher the more we want to avoid to steer
+steering_cost = 10000 # this indicates the cost of steering, the higher the more we want to avoid to steer
 
 def casadi_model():
     global F
