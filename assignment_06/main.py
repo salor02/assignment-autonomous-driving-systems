@@ -15,11 +15,11 @@ import frenet_optimal_trajectory as fp
 dt = 0.05         # Time step (s)
 ax = 0.0            # Constant longitudinal acceleration (m/s^2)
 steer = 0.0      # Constant steering angle (rad)
-sim_time = 75    # Simulation duration in seconds
+sim_time = 65    # Simulation duration in seconds
 steps = int(sim_time / dt)  # Simulation steps
 
 # Control references
-target_speed = 20
+target_speed = 30.3
 
 # Vehicle parameters
 lf = 1.156          # Distance from COG to front axle (m)
@@ -131,7 +131,7 @@ def plot_trajectory(x_vals, y_vals, labels, path_spline, frenet_x_results, frene
     plt.plot(spline_x, spline_y, label="Path Spline", linestyle="--", color="red")
 
     # Plot obstacles
-    if(len(ob[0]) is not 0):
+    if(len(ob[0]) != 0):
         plt.scatter(ob[:, 0], ob[:, 1], c='black', label="Obstacles", marker='x')
     
     # Customize plot
@@ -179,9 +179,10 @@ def run_simulation(ax, steer, dt, integrator, model, steps=500):
         "Fy_rear": [], # rear tires lateral force
         "ax": [], # acceleration
         "velocity_error": [], # error w.r.t. target speed
-        "lateral_error": [], # position error w.r.t. path
+        "lateral_error": [], # position error w.r.t. reference path
         "frenet_x": [], # next x position of the planned path
         "frenet_y": [], # next y position of the planned path
+        "frenet_lateral_error": [] # position error w.r.t. planned path
     }
 
     casadi_model()
@@ -241,14 +242,14 @@ def run_simulation(ax, steer, dt, integrator, model, steps=500):
         prj = [ global_position_projected[0], global_position_projected[1] ] # this is the point where the vehicle would be on the path in the ideal case
         local_error = lateral_error_calc(prj, actual_position, sim.theta)
 
-        if(abs(local_error[1]) > 4.0):
-            print("Lateral error is higher than 4.0... ending the simulation")
-            print("Lateral error: ", local_error[1])
-            break
+        # if(abs(local_error[1]) > 4.0):
+        #     print("Lateral error is higher than 4.0... ending the simulation")
+        #     print("Lateral error: ", local_error[1])
+        #     break
 
         local_position_projected = frenetpath_spline.calc_position(frenetpath_spline.cur_s)
         prj = [ local_position_projected[0], local_position_projected[1] ]
-        frenetlocal_error = point_transform(prj, actual_position, sim.theta)
+        frenetlocal_error = lateral_error_calc(prj, actual_position, sim.theta)
 
         nearest_idx = 0
         nearest_distance = abs(path_spline.cur_s - frenet_path.s[0])
@@ -265,48 +266,49 @@ def run_simulation(ax, steer, dt, integrator, model, steps=500):
         c_speed = frenet_path.s_d[nearest_idx]
         c_accel = frenet_path.s_dd[nearest_idx]
 
-        ### PURE PURSUIT
+        # ### PURE PURSUIT
 
-        # The following lines compute the target position in global coords, based on the lookahead distance
-        # Bonus: include here the curvature dependency
-        Lf = k_pp * sim.vx + look_ahead # compute the lookahead distance, depending on the current velocity (the look_ahead variable is the minimum value of Lf)
-        # TO-DO: Extend it to depend on curvature and/or speed
-        s_pos = frenetpath_spline.cur_s + Lf # add calculated distance to the current longitudinal position
-        trg = frenetpath_spline.calc_position(s_pos) # get global target coords <x,y>
+        # # The following lines compute the target position in global coords, based on the lookahead distance
+        # # Bonus: include here the curvature dependency
+        # Lf = k_pp * sim.vx + look_ahead # compute the lookahead distance, depending on the current velocity (the look_ahead variable is the minimum value of Lf)
+        # # TO-DO: Extend it to depend on curvature and/or speed
+        # s_pos = frenetpath_spline.cur_s + Lf # add calculated distance to the current longitudinal position
+        # trg = frenetpath_spline.calc_position(s_pos) # get global target coords <x,y>
 
-        # Adjust CoG position to the rear axle position for PP
-        pp_position = actual_position[0] + lr * math.cos(sim.theta), actual_position[1] + lr * math.sin(sim.theta)
+        # # Adjust CoG position to the rear axle position for PP
+        # pp_position = actual_position[0] + lr * math.cos(sim.theta), actual_position[1] + lr * math.sin(sim.theta)
 
-        # Compute distance between vehicle rear axle and lookahead point, both expressed in global coords
-        target_pos_local = point_transform([trg[0], trg[1]], pp_position, sim.theta)
+        # # Compute distance between vehicle rear axle and lookahead point, both expressed in global coords
+        # target_pos_local = point_transform([trg[0], trg[1]], pp_position, sim.theta)
 
-        # Calculate steer to track path
-        steer = pp_controller.compute_steering_angle(target_pos_local, sim.theta, Lf)
+        # # Calculate steer to track path
+        # steer = pp_controller.compute_steering_angle(target_pos_local, sim.theta, Lf)
 
         # ### STANLEY
 
         # # Adjust CoG position to the front axle position (convention for Stanley)
-        # px_front = position_projected[0] + lf * math.cos(sim.theta)
-        # py_front = position_projected[1] + lf * math.sin(sim.theta)
+        # px_front = local_position_projected[0] + lf * math.cos(sim.theta)
+        # py_front = local_position_projected[1] + lf * math.sin(sim.theta)
         # stanley_target = px_front, py_front, frenetpath_spline.calc_yaw(frenetpath_spline.cur_s)
         
         # actual_pose = sim.x, sim.y, sim.theta
         # steer = stanley_controller.compute_steering_angle(actual_pose, stanley_target, sim.vx)
 
-        # ### MPC
+        ### MPC
 
-        # # The following lines compute the target point on the path for the future horizon
-        # targets = [ ]
-        # s_pos = frenetpath_spline.cur_s
-        # for i in range(N):
-        #     step_increment = (sim.vx)*dt
-        #     trg = frenetpath_spline.calc_position(s_pos)
-        #     t_yaw = frenetpath_spline.calc_yaw(s_pos)
-        #     trg = [ trg[0], trg[1], t_yaw ]
-        #     targets.append(trg)
-        #     s_pos += step_increment
+        # The following lines compute the target point on the path for the future horizon
+        targets = [ ]
+        s_pos = frenetpath_spline.cur_s
+        for i in range(N):
+            step_increment = (sim.vx)*dt
+            trg = frenetpath_spline.calc_position(s_pos)
+            t_yaw = frenetpath_spline.calc_yaw(s_pos)
+            trg = [ trg[0], trg[1], t_yaw ]
+            targets.append(trg)
+            s_pos += step_increment
 
-        # steer = opt_step(targets, sim)
+        steer = opt_step(targets, sim)
+
         # Make one step simulation via model integration
         sim.integrate(ax, float(steer))
         
@@ -334,6 +336,7 @@ def run_simulation(ax, steer, dt, integrator, model, steps=500):
         # Errors
         results["velocity_error"].append(velocity_error)
         results["lateral_error"].append(local_error[1])
+        results["frenet_lateral_error"].append(frenetlocal_error[1])
 
     return results, settling_timestep
 
@@ -375,6 +378,7 @@ def main():
     lateral_error_results = [result["lateral_error"] for result in all_results]
     frenet_x_results = [result["frenet_x"] for result in all_results]
     frenet_y_results = [result["frenet_y"] for result in all_results]
+    frenet_lateral_error_results = [result["frenet_lateral_error"] for result in all_results]
 
     # Plot comparisons for each simulation value
     plot_trajectory(x_results, y_results, labels, path_spline, frenet_x_results, frenet_y_results)
@@ -388,7 +392,8 @@ def main():
     plot_comparison(beta_results, labels, "Side Slip Angle Comparison", "Time Step", "Side Slip Angle (rad)")
     plot_comparison(ax_results, labels, "Longitudinal Acceleration Comparison", "Time Step", "Acceleration (m/s^2)")
     plot_comparison(velocity_error_results, labels, "Velocity Error", "Time Step", "Velocity Error (m/s)", settling_timestep)
-    plot_comparison(lateral_error_results, labels, "Lateral Error", "Time Step", "Lateral Error (m)")
+    plot_comparison(lateral_error_results, labels, "Reference Path Lateral Error", "Time Step", "Lateral Error (m)")
+    plot_comparison(frenet_lateral_error_results, labels, "Frenet Planned Path Lateral Error", "Time Step", "Lateral Error (m)")
     plot_lateral_force(Fy_front_results, alpha_front_results, labels, "Front")
     plot_lateral_force(Fy_rear_results, alpha_rear_results, labels, "Rear")
 

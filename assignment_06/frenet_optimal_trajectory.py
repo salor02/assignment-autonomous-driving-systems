@@ -26,20 +26,28 @@ matplotlib.use('TkAgg')  # Or 'Agg', 'Qt5Agg', etc.
 from quintic_polynomials_planner import QuinticPolynomial 
 import cubic_spline_planner
 
-SIM_LOOP = 900
+SIM_LOOP = 1500
 
 # Parameter
-MAX_SPEED = 25.0  # maximum speed [m/s]
-MAX_ACCEL = 10.0  # maximum acceleration [m/ss]
+# The following three parameters will be checked during the execution
+MAX_SPEED = 10.0  # maximum speed [m/s]
+MAX_ACCEL = 2.0  # maximum acceleration [m/ss]
 MAX_CURVATURE = 2.0  # maximum curvature [1/m]
+
+# The following parameters control the sampling amplitude, and therefore the execution times
 MAX_ROAD_WIDTH = 5.0  # maximum road width [m]
 D_ROAD_W = 0.5  # road width sampling length [m]
-DT = 0.2  # time tick [s]
+
+# Lateral motion control parameters
+DT = 0.2  # time tick [s] the lower the smoother the maneuver is
 MAX_T = 5.0  # max prediction time [s]
 MIN_T = 4.5  # min prediction time [s]
-TARGET_SPEED = 23.0  # target speed [m/s]
+
+# Longitudinal motion control parameters
+TARGET_SPEED = 25.0  # target speed [m/s]
 D_T_S = 0.5  # target speed sampling length [m/s]
 N_S_SAMPLE = 1  # sampling number of target speed
+
 ROBOT_RADIUS = 3.0  # robot radius [m]
 
 # cost weights
@@ -310,14 +318,14 @@ def main():
     tx, ty, tyaw, tc, csp = generate_target_course(wx, wy)
 
     # initial state
-    c_speed = 5.0  # current speed [m/s]
+    c_speed = 5  # current speed [m/s]
     c_accel = 0.0  # current acceleration [m/ss]
     c_d = 0.0  # current lateral position [m]
     c_d_d = 0.0  # current lateral speed [m/s]
     c_d_dd = 0.0  # current lateral acceleration [m/s]
     s0 = 0.0  # current course position
 
-    area = 500.0  # animation area length [m]
+    area = 60.0  # animation area length [m]
 
     for i in range(SIM_LOOP):
         path = frenet_optimal_planning(
