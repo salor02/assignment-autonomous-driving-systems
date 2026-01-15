@@ -35,25 +35,25 @@ MAX_ACCEL = 2.0  # maximum acceleration [m/ss]
 MAX_CURVATURE = 2.0  # maximum curvature [1/m]
 
 # The following parameters control the sampling amplitude, and therefore the execution times
-MAX_ROAD_WIDTH = 5.0  # maximum road width [m]
-D_ROAD_W = 0.5  # road width sampling length [m]
+MAX_ROAD_WIDTH = 3.5  # maximum road width [m]
+D_ROAD_W = 0.2  # road width sampling length [m]
 
 # Lateral motion control parameters
 DT = 0.2  # time tick [s] the lower the smoother the maneuver is
-MAX_T = 5.0  # max prediction time [s]
-MIN_T = 4.5  # min prediction time [s]
+MAX_T = 4.5  # max prediction time [s]
+MIN_T = 4.45  # min prediction time [s]
 
 # Longitudinal motion control parameters
-TARGET_SPEED = 25.0  # target speed [m/s]
+TARGET_SPEED = 31  # target speed [m/s]
 D_T_S = 0.5  # target speed sampling length [m/s]
 N_S_SAMPLE = 1  # sampling number of target speed
 
 ROBOT_RADIUS = 3.0  # robot radius [m]
 
 # cost weights
-K_J = 0.1
+K_J = 0.5
 K_T = 0.1
-K_D = 1.0
+K_D = 0.5
 K_LAT = 1.0
 K_LON = 1.0
 

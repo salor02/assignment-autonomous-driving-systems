@@ -9,7 +9,8 @@ from mpc import *
 import cubic_spline_planner
 import math
 import matplotlib
-import frenet_optimal_trajectory as fp 
+import frenet_optimal_trajectory as fp
+import time 
 
 # Simulation parameters
 dt = 0.05         # Time step (s)
@@ -19,7 +20,7 @@ sim_time = 65    # Simulation duration in seconds
 steps = int(sim_time / dt)  # Simulation steps
 
 # Control references
-target_speed = 30.3
+target_speed = 31
 
 # Vehicle parameters
 lf = 1.156          # Distance from COG to front axle (m)
@@ -113,6 +114,22 @@ def plot_comparison(results, labels, title, xlabel, ylabel, settling_timestep = 
     plt.grid(True)
     plt.savefig("./img/" + title + ".png", dpi=300, bbox_inches='tight')
 
+def plot_time(results, labels, title, xlabel, ylabel):
+    """ Plot comparison of results for a specific state variable. """
+    plt.figure(figsize=(10, 6))
+    for i, result in enumerate(results):
+        plt.plot(result, label=labels[i])
+        mean = np.mean(result)
+
+    plt.axhline(y=mean, color='r', linestyle='--', label=f'Mean Execution Time: {mean:.2f} ms')
+
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.legend()
+    plt.grid(True)
+    plt.savefig("./img/" + title + ".png", dpi=300, bbox_inches='tight')
+
 def plot_trajectory(x_vals, y_vals, labels, path_spline, frenet_x_results, frenet_y_results):
     """ Plot 2D trajectory (x vs y) for all simulation configurations and path_spline trajectory. """
     plt.figure(figsize=(10, 6))
@@ -182,7 +199,8 @@ def run_simulation(ax, steer, dt, integrator, model, steps=500):
         "lateral_error": [], # position error w.r.t. reference path
         "frenet_x": [], # next x position of the planned path
         "frenet_y": [], # next y position of the planned path
-        "frenet_lateral_error": [] # position error w.r.t. planned path
+        "frenet_lateral_error": [], # position error w.r.t. planned path
+        "frenet_execution_time": [] # execution time of the frenet planner
     }
 
     casadi_model()
@@ -218,8 +236,12 @@ def run_simulation(ax, steer, dt, integrator, model, steps=500):
                 settled = False
 
         ### FRENET-PLANNER
-        frenet_path = fp.frenet_optimal_planning(
-            path_spline, s0, c_speed, c_accel, c_d, c_d_d, c_d_dd, ob)
+        start_time = time.perf_counter()  # start time measurement
+        
+        frenet_path = fp.frenet_optimal_planning(path_spline, s0, c_speed, c_accel, c_d, c_d_d, c_d_dd, ob)
+        
+        end_time = time.perf_counter()    # end time measurement
+        frenet_execution_time = (end_time - start_time) * 1000 # conversion in ms
         
         if(frenet_path is None):
             print("None available paths found from Frenet...")
@@ -338,6 +360,9 @@ def run_simulation(ax, steer, dt, integrator, model, steps=500):
         results["lateral_error"].append(local_error[1])
         results["frenet_lateral_error"].append(frenetlocal_error[1])
 
+        # Frenet execution time
+        results["frenet_execution_time"].append(frenet_execution_time)
+
     return results, settling_timestep
 
 def main():
@@ -379,6 +404,7 @@ def main():
     frenet_x_results = [result["frenet_x"] for result in all_results]
     frenet_y_results = [result["frenet_y"] for result in all_results]
     frenet_lateral_error_results = [result["frenet_lateral_error"] for result in all_results]
+    frenet_execution_time_results = [results["frenet_execution_time"] for result in all_results]
 
     # Plot comparisons for each simulation value
     plot_trajectory(x_results, y_results, labels, path_spline, frenet_x_results, frenet_y_results)
@@ -396,6 +422,7 @@ def main():
     plot_comparison(frenet_lateral_error_results, labels, "Frenet Planned Path Lateral Error", "Time Step", "Lateral Error (m)")
     plot_lateral_force(Fy_front_results, alpha_front_results, labels, "Front")
     plot_lateral_force(Fy_rear_results, alpha_rear_results, labels, "Rear")
+    plot_time(frenet_execution_time_results, labels, "Frenet Execution Time", "Time Step", "Execution Time (ms)")
 
 if __name__ == "__main__":
     main()
