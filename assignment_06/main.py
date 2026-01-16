@@ -273,6 +273,9 @@ def run_simulation(ax, steer, dt, integrator, model, steps=500):
         prj = [ local_position_projected[0], local_position_projected[1] ]
         frenetlocal_error = lateral_error_calc(prj, actual_position, sim.theta)
 
+        # The following lines look for the point belonging the the frenet path which is the closest to the current
+        # position of the vehicle based on the reference path longitudinal coordinate. This is done in order to
+        # create a new frenet curve that's perfectly "attached" to the previous one.
         nearest_idx = 0
         nearest_distance = abs(path_spline.cur_s - frenet_path.s[0])
         for i in range(len(frenet_path.s)):
@@ -281,6 +284,7 @@ def run_simulation(ax, steer, dt, integrator, model, steps=500):
                 nearest_distance = dist
                 nearest_idx = i
 
+        # Initialize values for the next Frenet iteration
         s0 = frenet_path.s[nearest_idx]
         c_d = frenet_path.d[nearest_idx]
         c_d_d = frenet_path.d_d[nearest_idx]
