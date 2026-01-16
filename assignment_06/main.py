@@ -295,9 +295,7 @@ def run_simulation(ax, steer, dt, integrator, model, steps=500):
         # ### PURE PURSUIT
 
         # # The following lines compute the target position in global coords, based on the lookahead distance
-        # # Bonus: include here the curvature dependency
         # Lf = k_pp * sim.vx + look_ahead # compute the lookahead distance, depending on the current velocity (the look_ahead variable is the minimum value of Lf)
-        # # TO-DO: Extend it to depend on curvature and/or speed
         # s_pos = frenetpath_spline.cur_s + Lf # add calculated distance to the current longitudinal position
         # trg = frenetpath_spline.calc_position(s_pos) # get global target coords <x,y>
 
